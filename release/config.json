@@ -1,0 +1,66 @@
+{
+  "template_file": "Charbogen.jpg",
+  "csv_file": "RandomTables.csv",
+  "min_font_size": 14,
+  "line_spacing": 6,
+  "top_padding": 4,
+  "a4_size": [3508, 2480],
+  "a4_layout": {
+    "margin": 90,
+    "gap": 50
+  },
+  "field_mapping": {
+    "Name": "Name",
+    "Aussehen": "Kaputte Körper",
+    "Eigenheiten": "Schlechte Angewohnheiten",
+    "Offene Schuld": "Offene Schuld",
+    "Art des Todes": "Art des Todes",
+    "Akte / Notizen": null
+  },
+  "field_layouts": {
+    "Name": {
+      "box": [184, 196, 487, 244],
+      "font_size": 28,
+      "align": "left"
+    },
+    "Aussehen": {
+      "box": [91, 351, 467, 545],
+      "font_size": 22,
+      "align": "left"
+    },
+    "Art des Todes": {
+      "box": [91, 716, 467, 907],
+      "font_size": 22,
+      "align": "left"
+    },
+    "Offene Schuld": {
+      "box": [1044, 351, 1407, 532],
+      "font_size": 22,
+      "align": "left"
+    },
+    "Eigenheiten": {
+      "box": [1044, 710, 1407, 891],
+      "font_size": 22,
+      "align": "left"
+    },
+    "Akte / Notizen": {
+      "box": [528, 900, 971, 988],
+      "font_size": 22,
+      "align": "left"
+    }
+  },
+  "attitude_markers": {
+    "x_positions": [1135, 1193, 1249, 1306, 1360, 1415],
+    "y": 123,
+    "radius": 23,
+    "line_width": 3
+  },
+  "debug": {
+    "enabled": false,
+    "field_box_color": "#ff0000",
+    "field_box_width": 3,
+    "label_color": "#0000ff",
+    "label_font_size": 18,
+    "attitude_color": "#008000"
+  }
+}
