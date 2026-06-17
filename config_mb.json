@@ -69,7 +69,7 @@
       "box": [128, 333, 820, 1052],
       "font_size": 22,
       "align": "left",
-      "multi_column_separator": "\n"
+      "multi_column_separator": "\n\n"
     },
     "Kräfte": {
       "box": [130, 1176, 768, 1630],
@@ -90,7 +90,7 @@
       "box": [1555, 635, 2326, 1517],
       "font_size": 20,
       "align": "left",
-      "multi_column_separator": "\n"
+      "multi_column_separator": "\n\n"
     },
     "Omen": {
       "box": [987, 1535, 1242, 1681],
