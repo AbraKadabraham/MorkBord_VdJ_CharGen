@@ -19,7 +19,8 @@ Attitude-Marker (grüne Kreise):
 Linkes Panel:
   – Feld auswählen für Einzel-Aktionen
   – Schriftgröße und Ausrichtung pro Feld anpassen
-  – Attitude-Einstellungen (Y, Radius, Linienstärke)
+  – Attitude-Einstellungen (Y, Radius, Linienstärke) — nur sichtbar wenn
+    attitude_markers in der Config vorhanden ist
 
 Speichern schreibt alle Werte in config.json.
 """
@@ -78,10 +79,12 @@ class FieldWizard(tk.Toplevel):
             for n in self._field_names
         }
 
-        att = config['attitude_markers']
-        self._att_x      = list(att['x_positions'])
-        self._att_y      = int(att['y'])
-        self._att_radius = int(att['radius'])
+        # attitude_markers kann None sein (z.B. Mörk Borg hat keine)
+        att = config.get('attitude_markers') or {}
+        self._has_attitude = bool(att)
+        self._att_x      = list(att.get('x_positions', []))
+        self._att_y      = int(att.get('y', 50))
+        self._att_radius = int(att.get('radius', 13))
         self._att_lw     = int(att.get('line_width', 3))
 
         self._mode           = 'fields'
@@ -123,14 +126,15 @@ class FieldWizard(tk.Toplevel):
         left.grid(row=0, column=0, sticky='ns')
         left.grid_propagate(False)
 
-        # Modus-Umschalter
+        # Modus-Umschalter — Attitude-Option nur anzeigen wenn vorhanden
         mode_frame = ttk.LabelFrame(left, text='Modus', padding=6)
         mode_frame.pack(fill='x', pady=(0, 8))
         self._mode_var = tk.StringVar(value='fields')
         ttk.Radiobutton(mode_frame, text='Felder', variable=self._mode_var,
                         value='fields',   command=self._on_mode_change).pack(anchor='w')
-        ttk.Radiobutton(mode_frame, text='Attitude-Marker', variable=self._mode_var,
-                        value='attitude', command=self._on_mode_change).pack(anchor='w')
+        if self._has_attitude:
+            ttk.Radiobutton(mode_frame, text='Attitude-Marker', variable=self._mode_var,
+                            value='attitude', command=self._on_mode_change).pack(anchor='w')
 
         # Feld-Liste
         field_frame = ttk.LabelFrame(left, text='Felder', padding=6)
@@ -175,34 +179,48 @@ class FieldWizard(tk.Toplevel):
             foreground='gray', font=('TkDefaultFont', 8)
         ).grid(row=3, column=0, columnspan=2, sticky='w', pady=(4, 0))
 
-        # Attitude-Einstellungen  – explizite IntVar-Initialisierung (kein getattr-Trick)
-        att_frame = ttk.LabelFrame(left, text='Attitude-Marker', padding=6)
-        att_frame.pack(fill='x', pady=(0, 8))
+        # Attitude-Einstellungen — nur wenn attitude_markers vorhanden
+        if self._has_attitude:
+            att_frame = ttk.LabelFrame(left, text='Attitude-Marker', padding=6)
+            att_frame.pack(fill='x', pady=(0, 8))
 
-        self._att_y_var  = tk.IntVar(value=self._att_y)
-        self._att_r_var  = tk.IntVar(value=self._att_radius)
-        self._att_lw_var = tk.IntVar(value=self._att_lw)
+            self._att_y_var  = tk.IntVar(value=self._att_y)
+            self._att_r_var  = tk.IntVar(value=self._att_radius)
+            self._att_lw_var = tk.IntVar(value=self._att_lw)
 
-        att_controls = [
-            ('Y-Position:',    self._att_y_var,  0,    5000),
-            ('Radius:',        self._att_r_var,  1,    200),
-            ('Linienstärke:',  self._att_lw_var, 1,    20),
-        ]
-        for row_idx, (label, var, lo, hi) in enumerate(att_controls):
-            ttk.Label(att_frame, text=label).grid(
-                row=row_idx, column=0, sticky='w', padx=(0, 4), pady=2)
-            ttk.Spinbox(att_frame, textvariable=var, from_=lo, to=hi, width=7,
-                        command=self._redraw_attitude).grid(
-                row=row_idx, column=1, sticky='w', pady=2)
-            var.trace_add('write', lambda *_: self._redraw_attitude())
+            att_controls = [
+                ('Y-Position:',    self._att_y_var,  0,    5000),
+                ('Radius:',        self._att_r_var,  1,    200),
+                ('Linienstärke:',  self._att_lw_var, 1,    20),
+            ]
+            for row_idx, (label, var, lo, hi) in enumerate(att_controls):
+                ttk.Label(att_frame, text=label).grid(
+                    row=row_idx, column=0, sticky='w', padx=(0, 4), pady=2)
+                ttk.Spinbox(att_frame, textvariable=var, from_=lo, to=hi, width=7,
+                            command=self._redraw_attitude).grid(
+                    row=row_idx, column=1, sticky='w', pady=2)
+                var.trace_add('write', lambda *_: self._redraw_attitude())
 
-        self._att_count_lbl = ttk.Label(att_frame, text='', foreground='gray')
-        self._att_count_lbl.grid(row=3, column=0, columnspan=2, sticky='w', pady=(4, 0))
-        ttk.Label(
-            att_frame,
-            text='Im Attitude-Modus:\nLinksklick = Kreis setzen\nRechtsklick = Kreis entfernen',
-            foreground='gray', font=('TkDefaultFont', 8)
-        ).grid(row=4, column=0, columnspan=2, sticky='w', pady=(4, 0))
+            self._att_count_lbl = ttk.Label(att_frame, text='', foreground='gray')
+            self._att_count_lbl.grid(row=3, column=0, columnspan=2, sticky='w', pady=(4, 0))
+            ttk.Label(
+                att_frame,
+                text='Im Attitude-Modus:\nLinksklick = Kreis setzen\nRechtsklick = Kreis entfernen',
+                foreground='gray', font=('TkDefaultFont', 8)
+            ).grid(row=4, column=0, columnspan=2, sticky='w', pady=(4, 0))
+        else:
+            # Platzhalter-Vars damit _redraw_attitude() nicht crasht
+            self._att_y_var  = tk.IntVar(value=self._att_y)
+            self._att_r_var  = tk.IntVar(value=self._att_radius)
+            self._att_lw_var = tk.IntVar(value=self._att_lw)
+            self._att_count_lbl = None
+            info = ttk.LabelFrame(left, text='Attitude-Marker', padding=6)
+            info.pack(fill='x', pady=(0, 8))
+            ttk.Label(
+                info,
+                text='Dieses System verwendet\nkeine Attitude-Marker.',
+                foreground='gray', font=('TkDefaultFont', 8)
+            ).pack(anchor='w')
 
         # Speichern / Abbrechen
         btn_frame = ttk.Frame(left)
@@ -342,6 +360,8 @@ class FieldWizard(tk.Toplevel):
 
     def _redraw_attitude(self):
         self._canvas.delete('attitude')
+        if not self._has_attitude:
+            return
         try:
             cy = int(self._att_y_var.get()  * self._scale)
             cr = max(1, int(self._att_r_var.get() * self._scale))
@@ -355,8 +375,9 @@ class FieldWizard(tk.Toplevel):
             self._canvas.create_text(
                 cx, cy + cr + 10, text=str(i + 1),
                 fill=_ATTITUDE_COLOR, font=('TkDefaultFont', 8), tags='attitude')
-        cnt = len(self._att_x)
-        self._att_count_lbl.config(text=f"{cnt} Kreis{'e' if cnt != 1 else ''}")
+        if self._att_count_lbl:
+            cnt = len(self._att_x)
+            self._att_count_lbl.config(text=f"{cnt} Kreis{'e' if cnt != 1 else ''}")
 
     # ------------------------------------------------------------------
     # Feld-Interaktion: Verschieben + Handles
@@ -461,7 +482,7 @@ class FieldWizard(tk.Toplevel):
         self._redraw_drag  = {}
         self._canvas.config(cursor='crosshair')
         self._status_var.set(
-            f'Neu aufziehen für „{self._selected_field}“ – Box auf dem Bogen aufziehen.')
+            f'Neu aufziehen für „{self._selected_field}" – Box auf dem Bogen aufziehen.')
 
     # ------------------------------------------------------------------
     # Attitude-Interaktion
@@ -491,20 +512,22 @@ class FieldWizard(tk.Toplevel):
             self._config['field_layouts'][name]['font_size'] = self._font_sizes[name]
             self._config['field_layouts'][name]['align']     = self._aligns[name]
 
-        try:
-            self._config['attitude_markers']['x_positions'] = self._att_x
-            self._config['attitude_markers']['y']           = int(self._att_y_var.get())
-            self._config['attitude_markers']['radius']      = int(self._att_r_var.get())
-            self._config['attitude_markers']['line_width']  = int(self._att_lw_var.get())
-        except (tk.TclError, ValueError):
-            pass
+        # Attitude-Marker nur speichern wenn vorhanden
+        if self._has_attitude:
+            try:
+                self._config['attitude_markers']['x_positions'] = self._att_x
+                self._config['attitude_markers']['y']           = int(self._att_y_var.get())
+                self._config['attitude_markers']['radius']      = int(self._att_r_var.get())
+                self._config['attitude_markers']['line_width']  = int(self._att_lw_var.get())
+            except (tk.TclError, ValueError):
+                pass
 
         try:
             with open(self._config_path, 'w', encoding='utf-8') as f:
                 json.dump(self._config, f, ensure_ascii=False, indent=2)
             messagebox.showinfo(
                 'Gespeichert',
-                'Alle Einstellungen wurden in config.json gespeichert.',
+                'Alle Einstellungen wurden gespeichert.',
                 parent=self)
         except Exception as exc:
             messagebox.showerror('Fehler beim Speichern', str(exc), parent=self)
