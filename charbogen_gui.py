@@ -122,7 +122,7 @@ class CharacterGenerator:
             self.columns = self.load_csv_columns(self.csv_path)
 
     def _is_mb_system(self) -> bool:
-        """Gibt True zurück wenn die aktuell geladene Config zum MB-System gehört."""
+        """Gibt True zurück wenn die aktive Config zum MB-System gehört."""
         cfg_file = self.config.get('csv_file', '')
         tmpl_file = self.config.get('template_file', '')
         return 'mb' in Path(cfg_file).stem.lower() or 'mb' in Path(tmpl_file).stem.lower()
@@ -227,14 +227,23 @@ class CharacterGenerator:
             lines.append(current)
         return lines
 
-    def fit_and_draw(self, draw, box, text, start_size, align='left', font_file=''):
+    def fit_and_draw(self, draw, box, text, start_size, align='left', font_file='',
+                     valign='top'):
+        """Zeichnet Text in eine Box mit automatischer Schriftgrößenanpassung.
+
+        Parameters
+        ----------
+        align  : horizontale Ausrichtung ('left' | 'center' | 'right')
+        valign : vertikale  Ausrichtung ('top'   | 'middle' | 'bottom')
+        """
         x1, y1, x2, y2 = box
-        max_width = x2 - x1
+        max_width  = x2 - x1
         max_height = y2 - y1
-        size = start_size
-        min_size = self.config.get('min_font_size', 14)
+        size       = start_size
+        min_size   = self.config.get('min_font_size', 14)
+
         while size >= min_size:
-            font = self.find_font(size, font_file)
+            font      = self.find_font(size, font_file)
             raw_lines = text.split('\n')
             all_lines = []
             for raw in raw_lines:
@@ -242,21 +251,30 @@ class CharacterGenerator:
                     all_lines.extend(self.wrap_text(draw, raw, font, max_width - 8))
                 else:
                     all_lines.append('')
-            line_box = draw.textbbox((0, 0), 'Ag', font=font)
+
+            line_box    = draw.textbbox((0, 0), 'Ag', font=font)
             line_height = (line_box[3] - line_box[1]) + self.config.get('line_spacing', 6)
             total_height = len(all_lines) * line_height
+
             if total_height <= max_height:
                 top_padding = self.config.get('top_padding', 4)
-                y = y1 + top_padding
+
+                if valign == 'middle':
+                    y = y1 + (max_height - total_height) // 2
+                elif valign == 'bottom':
+                    y = y2 - total_height - top_padding
+                else:  # 'top' (default)
+                    y = y1 + top_padding
+
                 for line in all_lines:
                     if line:
-                        bbox = draw.textbbox((0, 0), line, font=font)
+                        bbox  = draw.textbbox((0, 0), line, font=font)
                         width = bbox[2] - bbox[0]
                         if align == 'center':
                             x = x1 + (max_width - width) // 2
                         elif align == 'right':
                             x = x2 - width - 4
-                        else:  # left (default)
+                        else:  # left
                             x = x1 + 4
                         draw.text((x, y), line, fill='black', font=font)
                     y += line_height
@@ -309,8 +327,8 @@ class CharacterGenerator:
             mods[name] = _roll_ability(rng, use_4d6_drop=(i in bonus_indices))
 
         toughness_mod = mods['Zähigkeit']
-        hp = max(1, toughness_mod + rng.randint(1, 8))
-        omen = rng.randint(1, 2)
+        hp     = max(1, toughness_mod + rng.randint(1, 8))
+        omen   = rng.randint(1, 2)
         silver = (rng.randint(1, 6) + rng.randint(1, 6)) * 10
 
         return {
@@ -374,11 +392,7 @@ class CharacterGenerator:
                     character[write_to] = ''
 
         # ── 3. MÖRK BORG: regelbasierte Stats (überschreiben null-Felder) ─
-        #    Wird nur ausgeführt wenn die aktive Config zum MB-System gehört.
         if self._is_mb_system():
-            # rng ist hier nicht direkt verfügbar – wir nutzen den Pool-rng
-            # eines beliebigen Pools als Proxy, oder erzeugen einen eigenen.
-            # Da pools immer mindestens einen Eintrag hat, nehmen wir dessen rng.
             pool_rng = next(iter(pools.values())).rng if pools else random.Random()
             mb_stats = self.generate_mb_stats(pool_rng)
             character.update(mb_stats)
@@ -386,22 +400,23 @@ class CharacterGenerator:
         return character
 
     def render_sheet(self, character, rng):
-        img = Image.open(self.template_path).convert('RGB')
+        img  = Image.open(self.template_path).convert('RGB')
         draw = ImageDraw.Draw(img)
         for field_name, layout in self.field_layouts.items():
-            box = tuple(layout['box'])
-            size = layout['font_size']
-            align = layout.get('align', 'left')
-            font_file = layout.get('font_file', '')  # optional, '' = automatisch
-            value = character.get(field_name, '').strip()
+            box       = tuple(layout['box'])
+            size      = layout['font_size']
+            align     = layout.get('align',  'left')
+            valign    = layout.get('valign', 'top')
+            font_file = layout.get('font_file', '')
+            value     = character.get(field_name, '').strip()
             if value:
-                self.fit_and_draw(draw, box, value, size, align, font_file)
+                self.fit_and_draw(draw, box, value, size, align, font_file, valign)
 
         if self.attitude:
             idx = rng.randrange(len(self.attitude['x_positions']))
-            cx = self.attitude['x_positions'][idx]
-            cy = self.attitude['y']
-            r = self.attitude['radius']
+            cx  = self.attitude['x_positions'][idx]
+            cy  = self.attitude['y']
+            r   = self.attitude['radius']
             line_width = self.attitude['line_width']
             draw.line((cx - r, cy - r, cx + r, cy + r), fill='black', width=line_width)
             draw.line((cx - r, cy + r, cx + r, cy - r), fill='black', width=line_width)
@@ -410,47 +425,47 @@ class CharacterGenerator:
         return img
 
     def compose_a4_pages(self, images, output_dir, base_name):
-        margin = self.config['a4_layout']['margin']
-        gap = self.config['a4_layout']['gap']
+        margin  = self.config['a4_layout']['margin']
+        gap     = self.config['a4_layout']['gap']
         columns = 2
-        rows = 2
-        cell_w = (self.a4[0] - margin * 2 - gap * (columns - 1)) // columns
-        cell_h = (self.a4[1] - margin * 2 - gap * (rows - 1)) // rows
+        rows    = 2
+        cell_w  = (self.a4[0] - margin * 2 - gap * (columns - 1)) // columns
+        cell_h  = (self.a4[1] - margin * 2 - gap * (rows - 1))    // rows
         positions = []
         for row in range(rows):
             for col in range(columns):
                 x = margin + col * (cell_w + gap)
                 y = margin + row * (cell_h + gap)
                 positions.append((x, y))
-        pages = []
-        total_pages = math.ceil(len(images) / 4)
+        pages        = []
+        total_pages  = math.ceil(len(images) / 4)
         for page_index in range(total_pages):
-            page = Image.new('RGB', self.a4, 'white')
+            page  = Image.new('RGB', self.a4, 'white')
             chunk = images[page_index * 4:(page_index + 1) * 4]
             for img, (x, y) in zip(chunk, positions):
                 copy = img.copy()
                 copy.thumbnail((cell_w, cell_h), Image.LANCZOS)
-                px = x + (cell_w - copy.width) // 2
+                px = x + (cell_w - copy.width)  // 2
                 py = y + (cell_h - copy.height) // 2
                 page.paste(copy, (px, py))
             page_stem = f'{base_name}_a4_page_{page_index + 1}'
-            out_path = next_free_path(output_dir, page_stem, '.png')
+            out_path  = next_free_path(output_dir, page_stem, '.png')
             page.save(out_path)
             pages.append(out_path)
         return pages
 
     def generate_batch(self, count, seed, output_dir, base_name='charbogen'):
-        rng = random.Random(seed)
-        pools = self.build_pools(rng)
+        rng        = random.Random(seed)
+        pools      = self.build_pools(rng)
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
-        rendered = []
+        rendered     = []
         single_files = []
         for i in range(1, count + 1):
             character = self.generate_character(pools)
-            img = self.render_sheet(character, rng)
-            stem = f'{base_name}_{i:03d}'
-            out_path = next_free_path(output_dir, stem, '.png')
+            img       = self.render_sheet(character, rng)
+            stem      = f'{base_name}_{i:03d}'
+            out_path  = next_free_path(output_dir, stem, '.png')
             img.save(out_path)
             single_files.append(out_path)
             rendered.append(img)
@@ -478,14 +493,14 @@ class SettingsDialog(tk.Toplevel):
         self.resizable(False, False)
         self.grab_set()
 
-        self._config = config
+        self._config      = config
         self._config_path = Path(config_path)
-        self._app_dir = self._config_path.parent
+        self._app_dir     = self._config_path.parent
         self._reload_callback = reload_callback
-        self._parent = parent
+        self._parent      = parent
 
         self._template_var = tk.StringVar(value=config.get('template_file', ''))
-        self._csv_var = tk.StringVar(value=config.get('csv_file', ''))
+        self._csv_var      = tk.StringVar(value=config.get('csv_file', ''))
 
         self._build()
 
@@ -582,7 +597,7 @@ class SettingsDialog(tk.Toplevel):
 
     def _save(self):
         self._config['template_file'] = self._template_var.get().strip()
-        self._config['csv_file'] = self._csv_var.get().strip()
+        self._config['csv_file']      = self._csv_var.get().strip()
         try:
             with open(self._config_path, 'w', encoding='utf-8') as f:
                 json.dump(self._config, f, ensure_ascii=False, indent=2)
@@ -605,14 +620,14 @@ class App(tk.Tk):
         self.geometry('1180x960')
         self.preview_photo = None
         self.current_preview_seed = None
-        self.last_auto_seed = None
-        self.preview_pools = None
-        self._prev_pool_seed = None
+        self.last_auto_seed       = None
+        self.preview_pools        = None
+        self._prev_pool_seed      = None
         self.debug_enabled = bool(self.generator.config.get('debug', {}).get('enabled', False))
-        self._warning_bar = None
+        self._warning_bar  = None
 
-        system_names = list(SYSTEMS.keys())
-        self._current_system = initial_system if initial_system in SYSTEMS else system_names[0]
+        system_names           = list(SYSTEMS.keys())
+        self._current_system   = initial_system if initial_system in SYSTEMS else system_names[0]
 
         self._build_ui()
 
@@ -704,8 +719,8 @@ class App(tk.Tk):
         if selected == self._current_system:
             return
         self._current_system = selected
-        config_file = SYSTEMS[selected]
-        config_path = APP_DIR / config_file
+        config_file  = SYSTEMS[selected]
+        config_path  = APP_DIR / config_file
         try:
             config = load_config(config_path)
             self.generator.reload_from_config(config)
@@ -719,10 +734,10 @@ class App(tk.Tk):
         except Exception as e:
             messagebox.showerror('Fehler beim Laden', str(e), parent=self)
             return
-        self.preview_pools = None
+        self.preview_pools   = None
         self._prev_pool_seed = None
         self.seed_var.set('')
-        self.last_auto_seed = None
+        self.last_auto_seed  = None
         if self.generator.is_ready():
             self._hide_warning_bar()
             self.refresh_preview()
@@ -778,7 +793,7 @@ class App(tk.Tk):
         try:
             seed, user_locked = self.determine_preview_seed()
             if self.preview_pools is None or seed != self._prev_pool_seed:
-                self.preview_pools = self.generator.build_pools(random.Random(seed))
+                self.preview_pools   = self.generator.build_pools(random.Random(seed))
                 self._prev_pool_seed = seed
             img = self.generator.generate_preview(seed, pools=self.preview_pools)
             self.current_preview_seed = seed
@@ -807,7 +822,7 @@ class App(tk.Tk):
             self.generator.reload_from_config(config)
             self.debug_enabled = bool(
                 self.generator.config.get('debug', {}).get('enabled', False))
-            self.preview_pools = None
+            self.preview_pools   = None
             self._prev_pool_seed = None
             if self.generator.is_ready():
                 self._hide_warning_bar()
@@ -837,7 +852,7 @@ class App(tk.Tk):
                 parent=self)
             return
         try:
-            seed = self.parse_seed()
+            seed  = self.parse_seed()
             count = int(self.count_var.get().strip())
             if count < 1:
                 raise ValueError('Die Anzahl muss mindestens 1 sein.')
@@ -870,9 +885,9 @@ def load_config(path=None):
 
 
 def main():
-    config = load_config()
+    config    = load_config()
     generator = CharacterGenerator(config)
-    app = App(generator, initial_system=list(SYSTEMS.keys())[0])
+    app       = App(generator, initial_system=list(SYSTEMS.keys())[0])
     app.mainloop()
 
 

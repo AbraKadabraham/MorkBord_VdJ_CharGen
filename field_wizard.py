@@ -18,7 +18,7 @@ Attitude-Marker (grüne Kreise):
 
 Linkes Panel:
   – Feld auswählen für Einzel-Aktionen
-  – Schriftgröße, Ausrichtung und Schriftart pro Feld anpassen
+  – Schriftgröße, Ausrichtung (horizontal + vertikal) und Schriftart pro Feld
   – Attitude-Einstellungen (Y, Radius, Linienstärke) — nur sichtbar wenn
     attitude_markers in der Config vorhanden ist
 
@@ -70,11 +70,9 @@ def _find_font_path(filename, app_dir):
     """Sucht eine .ttf-Datei: erst fonts/-Ordner, dann Systempfade."""
     if not filename:
         return None
-    # 1) Lokaler fonts/-Ordner neben der App
     local = app_dir / 'fonts' / filename
     if local.exists():
         return local
-    # 2) Systemweite Pfade
     for d in _FONT_SEARCH_DIRS:
         candidate = d / filename
         if candidate.exists():
@@ -92,7 +90,6 @@ def _collect_available_fonts(app_dir):
     entries = [('Standard (automatisch)', '')]
     seen_files = set()
 
-    # Lokale fonts/ – alle .ttf/.otf
     fonts_dir = app_dir / 'fonts'
     if fonts_dir.is_dir():
         for f in sorted(fonts_dir.iterdir()):
@@ -100,8 +97,7 @@ def _collect_available_fonts(app_dir):
                 entries.append((f.stem, f.name))
                 seen_files.add(f.name.lower())
 
-    # Bekannte Systemschriften
-    for name, filename in _SYSTEM_FONTS[1:]:  # [0] ist der Standard-Eintrag
+    for name, filename in _SYSTEM_FONTS[1:]:
         if filename.lower() in seen_files:
             continue
         if _find_font_path(filename, app_dir):
@@ -146,31 +142,31 @@ class FieldWizard(tk.Toplevel):
             n: config['field_layouts'][n].get('align', 'left')
             for n in self._field_names
         }
-        # Schriftart pro Feld: leerer String = automatisch (find_font-Logik)
+        self._valigns = {
+            n: config['field_layouts'][n].get('valign', 'top')
+            for n in self._field_names
+        }
         self._font_files = {
             n: config['field_layouts'][n].get('font_file', '')
             for n in self._field_names
         }
 
-        # Verfügbare Fonts sammeln
-        self._available_fonts = _collect_available_fonts(self._app_dir)
-        self._font_display_names = [name for name, _ in self._available_fonts]
+        self._available_fonts    = _collect_available_fonts(self._app_dir)
+        self._font_display_names = [name  for name,  _ in self._available_fonts]
         self._font_file_names    = [fname for _, fname in self._available_fonts]
 
-        # attitude_markers kann None sein (z.B. Mörk Borg hat keine)
         att = config.get('attitude_markers') or {}
         self._has_attitude = bool(att)
-        self._att_x      = list(att.get('x_positions', []))
-        self._att_y      = int(att.get('y', 50))
-        self._att_radius = int(att.get('radius', 13))
-        self._att_lw     = int(att.get('line_width', 3))
+        self._att_x        = list(att.get('x_positions', []))
+        self._att_y        = int(att.get('y', 50))
+        self._att_radius   = int(att.get('radius', 13))
+        self._att_lw       = int(att.get('line_width', 3))
 
         self._mode           = 'fields'
         self._selected_field = self._field_names[0] if self._field_names else None
         self._draw_new_for   = None
         self._adj_active     = None
 
-        # Bild laden – bei Fehler Dialog sauber schließen
         if not self._load_image():
             self.destroy()
             return
@@ -183,7 +179,6 @@ class FieldWizard(tk.Toplevel):
     # ------------------------------------------------------------------
 
     def _load_image(self):
-        """Lädt das Template-Bild. Gibt True zurück wenn erfolgreich, sonst False."""
         path = self._app_dir / self._config.get('template_file', '')
         try:
             self._orig = Image.open(path).convert('RGB')
@@ -210,8 +205,8 @@ class FieldWizard(tk.Toplevel):
         )
         cw = int(self._orig.width  * self._scale)
         ch = int(self._orig.height * self._scale)
-        self._tk_img    = ImageTk.PhotoImage(self._orig.resize((cw, ch), Image.LANCZOS))
-        self._cw, self._ch = cw, ch
+        self._tk_img        = ImageTk.PhotoImage(self._orig.resize((cw, ch), Image.LANCZOS))
+        self._cw, self._ch  = cw, ch
         return True
 
     # ------------------------------------------------------------------
@@ -264,8 +259,8 @@ class FieldWizard(tk.Toplevel):
                     command=self._on_fontsize_change).grid(row=0, column=1, sticky='w')
         self._fontsize_var.trace_add('write', lambda *_: self._on_fontsize_change())
 
-        # Ausrichtung
-        ttk.Label(fset_frame, text='Ausrichtung:').grid(
+        # Horizontale Ausrichtung
+        ttk.Label(fset_frame, text='H-Ausrichtung:').grid(
             row=1, column=0, sticky='w', pady=(6, 0))
         self._align_var = tk.StringVar(value='left')
         ttk.Combobox(fset_frame, textvariable=self._align_var,
@@ -273,9 +268,18 @@ class FieldWizard(tk.Toplevel):
                      state='readonly').grid(row=1, column=1, sticky='w', pady=(6, 0))
         self._align_var.trace_add('write', lambda *_: self._on_align_change())
 
+        # Vertikale Ausrichtung
+        ttk.Label(fset_frame, text='V-Ausrichtung:').grid(
+            row=2, column=0, sticky='w', pady=(6, 0))
+        self._valign_var = tk.StringVar(value='top')
+        ttk.Combobox(fset_frame, textvariable=self._valign_var,
+                     values=['top', 'middle', 'bottom'], width=8,
+                     state='readonly').grid(row=2, column=1, sticky='w', pady=(6, 0))
+        self._valign_var.trace_add('write', lambda *_: self._on_valign_change())
+
         # Schriftart
         ttk.Label(fset_frame, text='Schriftart:').grid(
-            row=2, column=0, sticky='w', pady=(6, 0))
+            row=3, column=0, sticky='w', pady=(6, 0))
         self._font_var = tk.StringVar(value=self._font_display_names[0])
         self._font_combo = ttk.Combobox(
             fset_frame,
@@ -284,18 +288,18 @@ class FieldWizard(tk.Toplevel):
             width=18,
             state='readonly',
         )
-        self._font_combo.grid(row=2, column=0, columnspan=2, sticky='ew', pady=(6, 0))
+        self._font_combo.grid(row=3, column=0, columnspan=2, sticky='ew', pady=(6, 0))
         self._font_var.trace_add('write', lambda *_: self._on_font_change())
 
         # Neu aufziehen
         ttk.Button(fset_frame, text='Neu aufziehen',
                    command=self._start_redraw).grid(
-            row=3, column=0, columnspan=2, sticky='ew', pady=(8, 0))
+            row=4, column=0, columnspan=2, sticky='ew', pady=(8, 0))
         ttk.Label(
             fset_frame,
             text='Feld auswählen, dann\n"Neu aufziehen" klicken\nund Box aufziehen.',
             foreground='gray', font=('TkDefaultFont', 8)
-        ).grid(row=4, column=0, columnspan=2, sticky='w', pady=(4, 0))
+        ).grid(row=5, column=0, columnspan=2, sticky='w', pady=(4, 0))
 
         # Attitude-Einstellungen
         if self._has_attitude:
@@ -413,13 +417,13 @@ class FieldWizard(tk.Toplevel):
             return
         self._fontsize_var.set(self._font_sizes[self._selected_field])
         self._align_var.set(self._aligns[self._selected_field])
-        # Schriftart-Dropdown auf aktuellen Wert setzen
+        self._valign_var.set(self._valigns[self._selected_field])
         current_file = self._font_files.get(self._selected_field, '')
         if current_file in self._font_file_names:
             idx = self._font_file_names.index(current_file)
             self._font_var.set(self._font_display_names[idx])
         else:
-            self._font_var.set(self._font_display_names[0])  # Standard
+            self._font_var.set(self._font_display_names[0])
 
     def _on_fontsize_change(self):
         if not self._selected_field:
@@ -433,6 +437,11 @@ class FieldWizard(tk.Toplevel):
         if not self._selected_field:
             return
         self._aligns[self._selected_field] = self._align_var.get()
+
+    def _on_valign_change(self):
+        if not self._selected_field:
+            return
+        self._valigns[self._selected_field] = self._valign_var.get()
 
     def _on_font_change(self):
         if not self._selected_field:
@@ -470,9 +479,16 @@ class FieldWizard(tk.Toplevel):
         color  = _FIELD_COLORS[self._field_names.index(name) % len(_FIELD_COLORS)]
         lw     = 3 if is_sel else 1
 
-        # Schriftart-Hinweis im Label anzeigen wenn gesetzt
-        font_hint = self._font_files.get(name, '')
-        label_text = name if not font_hint else f'{name} [{Path(font_hint).stem}]'
+        font_hint  = self._font_files.get(name, '')
+        valign_hint = self._valigns.get(name, 'top')
+        label_text = name
+        hints = []
+        if font_hint:
+            hints.append(Path(font_hint).stem)
+        if valign_hint != 'top':
+            hints.append(valign_hint)
+        if hints:
+            label_text = f'{name} [{", ".join(hints)}]'
 
         c.create_rectangle(x1, y1, x2, y2, outline=color, width=lw, fill='',
                             tags=(tag_box, 'field_box'))
@@ -645,7 +661,7 @@ class FieldWizard(tk.Toplevel):
             self._config['field_layouts'][name]['box']       = self._boxes[name]
             self._config['field_layouts'][name]['font_size'] = self._font_sizes[name]
             self._config['field_layouts'][name]['align']     = self._aligns[name]
-            # font_file: leeren String nicht speichern (saubere Config)
+            self._config['field_layouts'][name]['valign']    = self._valigns[name]
             font_file = self._font_files.get(name, '')
             if font_file:
                 self._config['field_layouts'][name]['font_file'] = font_file
