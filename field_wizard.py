@@ -8,8 +8,8 @@ Bedienung
 Felder (farbige Boxen):
   – Box verschieben : Klicken + Ziehen auf die Box
   – Größe ändern   : An einem der 8 Handles ziehen
-  – Box neu ziehen : Doppelklick auf einen freien Bereich startet einen
-                     Neu-Aufziehen-Modus für das im linken Panel selektierte Feld
+  – Box neu ziehen : Feld links auswählen, dann "Neu aufziehen" klicken
+                     und Box auf dem Bogen aufziehen
 
 Attitude-Marker (grüne Kreise):
   – Neuen Kreis setzen : Linksklick auf freien Bereich im Attitude-Modus
@@ -84,10 +84,10 @@ class FieldWizard(tk.Toplevel):
         self._att_radius = int(att['radius'])
         self._att_lw     = int(att.get('line_width', 3))
 
-        # Modus: 'fields' oder 'attitude'
-        self._mode = 'fields'
+        self._mode           = 'fields'
         self._selected_field = self._field_names[0] if self._field_names else None
-        self._draw_new_for   = None   # Feld, für das gerade neu aufgezogen wird
+        self._draw_new_for   = None
+        self._adj_active     = None
 
         self._load_image()
         self._build_ui()
@@ -99,7 +99,7 @@ class FieldWizard(tk.Toplevel):
 
     def _load_image(self):
         path = self._app_dir / self._config['template_file']
-        self._orig = Image.open(path).convert('RGB')
+        self._orig  = Image.open(path).convert('RGB')
         self._scale = min(
             _CANVAS_MAX_W / self._orig.width,
             _CANVAS_MAX_H / self._orig.height,
@@ -107,8 +107,7 @@ class FieldWizard(tk.Toplevel):
         )
         cw = int(self._orig.width  * self._scale)
         ch = int(self._orig.height * self._scale)
-        self._tk_img = ImageTk.PhotoImage(
-            self._orig.resize((cw, ch), Image.LANCZOS))
+        self._tk_img    = ImageTk.PhotoImage(self._orig.resize((cw, ch), Image.LANCZOS))
         self._cw, self._ch = cw, ch
 
     # ------------------------------------------------------------------
@@ -129,7 +128,7 @@ class FieldWizard(tk.Toplevel):
         mode_frame.pack(fill='x', pady=(0, 8))
         self._mode_var = tk.StringVar(value='fields')
         ttk.Radiobutton(mode_frame, text='Felder', variable=self._mode_var,
-                        value='fields', command=self._on_mode_change).pack(anchor='w')
+                        value='fields',   command=self._on_mode_change).pack(anchor='w')
         ttk.Radiobutton(mode_frame, text='Attitude-Marker', variable=self._mode_var,
                         value='attitude', command=self._on_mode_change).pack(anchor='w')
 
@@ -153,7 +152,7 @@ class FieldWizard(tk.Toplevel):
 
         ttk.Label(fset_frame, text='Schriftgröße:').grid(
             row=0, column=0, sticky='w', padx=(0, 4))
-        self._fontsize_var = tk.IntVar()
+        self._fontsize_var = tk.IntVar(value=0)
         ttk.Spinbox(fset_frame, textvariable=self._fontsize_var,
                     from_=8, to=120, width=6,
                     command=self._on_fontsize_change).grid(row=0, column=1, sticky='w')
@@ -161,39 +160,37 @@ class FieldWizard(tk.Toplevel):
 
         ttk.Label(fset_frame, text='Ausrichtung:').grid(
             row=1, column=0, sticky='w', pady=(6, 0))
-        self._align_var = tk.StringVar()
-        align_cb = ttk.Combobox(fset_frame, textvariable=self._align_var,
-                                values=['left', 'center'], width=8, state='readonly')
-        align_cb.grid(row=1, column=1, sticky='w', pady=(6, 0))
+        self._align_var = tk.StringVar(value='left')
+        ttk.Combobox(fset_frame, textvariable=self._align_var,
+                     values=['left', 'center'], width=8,
+                     state='readonly').grid(row=1, column=1, sticky='w', pady=(6, 0))
         self._align_var.trace_add('write', lambda *_: self._on_align_change())
 
         ttk.Button(fset_frame, text='Neu aufziehen',
                    command=self._start_redraw).grid(
             row=2, column=0, columnspan=2, sticky='ew', pady=(8, 0))
-
         ttk.Label(
             fset_frame,
-            text='Feld zuerst links auswählen,\ndann auf "Neu aufziehen" klicken\nund Box auf dem Bogen aufziehen.',
+            text='Feld auswählen, dann\n"Neu aufziehen" klicken\nund Box aufziehen.',
             foreground='gray', font=('TkDefaultFont', 8)
         ).grid(row=3, column=0, columnspan=2, sticky='w', pady=(4, 0))
 
-        # Attitude-Einstellungen
+        # Attitude-Einstellungen  – explizite IntVar-Initialisierung (kein getattr-Trick)
         att_frame = ttk.LabelFrame(left, text='Attitude-Marker', padding=6)
         att_frame.pack(fill='x', pady=(0, 8))
 
-        for row_idx, (label, attr, lo, hi) in enumerate([
-            ('Y-Position:', '_att_y_var',  0,    5000),
-            ('Radius:',     '_att_r_var',  1,    200),
-            ('Linienstärke:', '_att_lw_var', 1, 20),
-        ]):
+        self._att_y_var  = tk.IntVar(value=self._att_y)
+        self._att_r_var  = tk.IntVar(value=self._att_radius)
+        self._att_lw_var = tk.IntVar(value=self._att_lw)
+
+        att_controls = [
+            ('Y-Position:',    self._att_y_var,  0,    5000),
+            ('Radius:',        self._att_r_var,  1,    200),
+            ('Linienstärke:',  self._att_lw_var, 1,    20),
+        ]
+        for row_idx, (label, var, lo, hi) in enumerate(att_controls):
             ttk.Label(att_frame, text=label).grid(
                 row=row_idx, column=0, sticky='w', padx=(0, 4), pady=2)
-            var = tk.IntVar(value=getattr(self, '_att_' + attr.lstrip('_att_').rstrip('_var')))
-            # map attr names correctly
-            if attr == '_att_y_var':  var.set(self._att_y)
-            elif attr == '_att_r_var': var.set(self._att_radius)
-            elif attr == '_att_lw_var': var.set(self._att_lw)
-            setattr(self, attr, var)
             ttk.Spinbox(att_frame, textvariable=var, from_=lo, to=hi, width=7,
                         command=self._redraw_attitude).grid(
                 row=row_idx, column=1, sticky='w', pady=2)
@@ -201,7 +198,6 @@ class FieldWizard(tk.Toplevel):
 
         self._att_count_lbl = ttk.Label(att_frame, text='', foreground='gray')
         self._att_count_lbl.grid(row=3, column=0, columnspan=2, sticky='w', pady=(4, 0))
-
         ttk.Label(
             att_frame,
             text='Im Attitude-Modus:\nLinksklick = Kreis setzen\nRechtsklick = Kreis entfernen',
@@ -230,7 +226,6 @@ class FieldWizard(tk.Toplevel):
         )
         self._canvas.grid(row=0, column=0, sticky='nsew')
 
-        # Status-Zeile
         self._status_var = tk.StringVar(value='Felder-Modus aktiv.')
         ttk.Label(canvas_frame, textvariable=self._status_var,
                   foreground='gray').grid(row=1, column=0, sticky='w', pady=(4, 0))
@@ -260,7 +255,6 @@ class FieldWizard(tk.Toplevel):
         c.unbind('<ButtonRelease-1>')
         c.unbind('<ButtonPress-3>')
         c.config(cursor='crosshair' if self._mode == 'attitude' else 'arrow')
-
         if self._mode == 'fields':
             c.bind('<ButtonPress-1>',   self._field_press)
             c.bind('<B1-Motion>',        self._field_drag)
@@ -311,7 +305,7 @@ class FieldWizard(tk.Toplevel):
         self._redraw_attitude()
 
     def _draw_field_box(self, name, redraw=False):
-        c = self._canvas
+        c       = self._canvas
         tag_box = f'box_{name}'
         tag_lbl = f'lbl_{name}'
         tag_hdl = f'hdl_{name}'
@@ -320,30 +314,27 @@ class FieldWizard(tk.Toplevel):
             c.delete(tag_lbl)
             c.delete(tag_hdl)
 
-        b = _scale_box(self._boxes[name], self._scale)
+        b  = _scale_box(self._boxes[name], self._scale)
         x1, y1, x2, y2 = b
         is_sel = (name == self._selected_field)
-        color = _FIELD_COLORS[self._field_names.index(name) % len(_FIELD_COLORS)]
-        lw = 3 if is_sel else 1
+        color  = _FIELD_COLORS[self._field_names.index(name) % len(_FIELD_COLORS)]
+        lw     = 3 if is_sel else 1
 
-        c.create_rectangle(x1, y1, x2, y2,
-                            outline=color, width=lw, fill='',
+        c.create_rectangle(x1, y1, x2, y2, outline=color, width=lw, fill='',
                             tags=(tag_box, 'field_box'))
-        c.create_text(x1 + 4, y1 + 4, anchor='nw',
-                      text=name, fill=color,
+        c.create_text(x1 + 4, y1 + 4, anchor='nw', text=name, fill=color,
                       font=('TkDefaultFont', 9, 'bold' if is_sel else 'normal'),
                       tags=(tag_lbl, 'field_lbl'))
 
         if is_sel:
             hs = _HANDLE_SIZE
             mx, my = (x1 + x2) // 2, (y1 + y2) // 2
-            handles = {
-                'nw': (x1, y1), 'n':  (mx, y1), 'ne': (x2, y1),
+            for edge, (hx, hy) in {
+                'nw': (x1, y1), 'n': (mx, y1), 'ne': (x2, y1),
                 'e':  (x2, my),
-                'se': (x2, y2), 's':  (mx, y2), 'sw': (x1, y2),
+                'se': (x2, y2), 's': (mx, y2), 'sw': (x1, y2),
                 'w':  (x1, my),
-            }
-            for edge, (hx, hy) in handles.items():
+            }.items():
                 c.create_rectangle(
                     hx - hs, hy - hs, hx + hs, hy + hs,
                     fill=color, outline='white', width=1,
@@ -352,7 +343,7 @@ class FieldWizard(tk.Toplevel):
     def _redraw_attitude(self):
         self._canvas.delete('attitude')
         try:
-            cy = int(self._att_y_var.get() * self._scale)
+            cy = int(self._att_y_var.get()  * self._scale)
             cr = max(1, int(self._att_r_var.get() * self._scale))
         except (tk.TclError, ValueError):
             return
@@ -363,32 +354,27 @@ class FieldWizard(tk.Toplevel):
                 outline=_ATTITUDE_COLOR, width=2, tags='attitude')
             self._canvas.create_text(
                 cx, cy + cr + 10, text=str(i + 1),
-                fill=_ATTITUDE_COLOR, font=('TkDefaultFont', 8),
-                tags='attitude')
+                fill=_ATTITUDE_COLOR, font=('TkDefaultFont', 8), tags='attitude')
         cnt = len(self._att_x)
-        self._att_count_lbl.config(
-            text=f"{cnt} Kreis{'e' if cnt != 1 else ''}")
+        self._att_count_lbl.config(text=f"{cnt} Kreis{'e' if cnt != 1 else ''}")
 
     # ------------------------------------------------------------------
-    # Feld-Interaktion: Bewegen + Handles
+    # Feld-Interaktion: Verschieben + Handles
     # ------------------------------------------------------------------
-
-    _adj_active = None
 
     def _field_press(self, ev):
-        # Neu-Aufziehen-Modus hat Vorrang
         if self._draw_new_for is not None:
-            self.__redraw_drag = {'x0': ev.x, 'y0': ev.y, 'rect': None}
+            self._redraw_drag = {'x0': ev.x, 'y0': ev.y, 'rect': None}
             return
 
         items = self._canvas.find_overlapping(
             ev.x - _HANDLE_SIZE, ev.y - _HANDLE_SIZE,
             ev.x + _HANDLE_SIZE, ev.y + _HANDLE_SIZE)
 
-        # Handle?
+        # Handle-Treffer?
         for item in reversed(items):
             for tag in self._canvas.gettags(item):
-                if tag.startswith('hdl_') and '_' in tag[4:]:
+                if tag.startswith('hdl_') and tag.count('_') >= 2:
                     parts = tag[4:].rsplit('_', 1)
                     if len(parts) == 2 and parts[0] in self._field_names:
                         name, edge = parts
@@ -397,13 +383,12 @@ class FieldWizard(tk.Toplevel):
                             'edge': edge, 'lx': ev.x, 'ly': ev.y}
                         return
 
-        # Box?
+        # Box-Treffer?
         for item in reversed(items):
             for tag in self._canvas.gettags(item):
                 if tag.startswith('box_'):
                     name = tag[4:]
                     if name in self._field_names:
-                        # Feld selektieren
                         idx = self._field_names.index(name)
                         self._field_listbox.selection_clear(0, 'end')
                         self._field_listbox.selection_set(idx)
@@ -417,9 +402,8 @@ class FieldWizard(tk.Toplevel):
                         return
 
     def _field_drag(self, ev):
-        # Neu-Aufziehen-Modus
         if self._draw_new_for is not None:
-            d = self.__redraw_drag
+            d = self._redraw_drag
             if d.get('rect'):
                 self._canvas.delete(d['rect'])
             d['rect'] = self._canvas.create_rectangle(
@@ -429,11 +413,11 @@ class FieldWizard(tk.Toplevel):
 
         if not self._adj_active:
             return
-        a = self._adj_active
+        a  = self._adj_active
         dx = ev.x - a['lx']
         dy = ev.y - a['ly']
         a['lx'], a['ly'] = ev.x, ev.y
-        x1, y1, x2, y2 = _scale_box(self._boxes[a['name']], self._scale)
+        x1, y1, x2, y2  = _scale_box(self._boxes[a['name']], self._scale)
 
         if a['type'] == 'move':
             x1 += dx; y1 += dy; x2 += dx; y2 += dy
@@ -450,15 +434,13 @@ class FieldWizard(tk.Toplevel):
         self._draw_field_box(a['name'], redraw=True)
 
     def _field_release(self, ev):
-        # Neu-Aufziehen abschließen
         if self._draw_new_for is not None:
-            d = self.__redraw_drag
+            d  = self._redraw_drag
             self._canvas.delete('newbox')
             if d.get('rect'):
                 self._canvas.delete(d['rect'])
-            x0, y0 = d['x0'], d['y0']
-            xs = sorted([x0, ev.x])
-            ys = sorted([y0, ev.y])
+            xs = sorted([d['x0'], ev.x])
+            ys = sorted([d['y0'], ev.y])
             if (xs[1] - xs[0]) >= _MIN_BOX and (ys[1] - ys[0]) >= _MIN_BOX:
                 self._boxes[self._draw_new_for] = _unscale_box(
                     [xs[0], ys[0], xs[1], ys[1]], self._scale)
@@ -476,18 +458,17 @@ class FieldWizard(tk.Toplevel):
         self._mode = 'fields'
         self._bind_canvas()
         self._draw_new_for = self._selected_field
-        self.__redraw_drag = {}
+        self._redraw_drag  = {}
         self._canvas.config(cursor='crosshair')
         self._status_var.set(
-            f'Neu aufziehen für "{self._selected_field}" – Box auf dem Bogen aufziehen.')
+            f'Neu aufziehen für „{self._selected_field}“ – Box auf dem Bogen aufziehen.')
 
     # ------------------------------------------------------------------
     # Attitude-Interaktion
     # ------------------------------------------------------------------
 
     def _att_left_click(self, ev):
-        img_x = int(ev.x / self._scale)
-        self._att_x.append(img_x)
+        self._att_x.append(int(ev.x / self._scale))
         self._att_x.sort()
         self._redraw_attitude()
 
@@ -495,8 +476,8 @@ class FieldWizard(tk.Toplevel):
         if not self._att_x:
             return
         canvas_xs = [int(x * self._scale) for x in self._att_x]
-        closest = min(range(len(canvas_xs)),
-                      key=lambda i: abs(canvas_xs[i] - ev.x))
+        closest   = min(range(len(canvas_xs)),
+                        key=lambda i: abs(canvas_xs[i] - ev.x))
         self._att_x.pop(closest)
         self._redraw_attitude()
 
@@ -505,7 +486,6 @@ class FieldWizard(tk.Toplevel):
     # ------------------------------------------------------------------
 
     def _save(self):
-        s = self._scale
         for name in self._field_names:
             self._config['field_layouts'][name]['box']       = self._boxes[name]
             self._config['field_layouts'][name]['font_size'] = self._font_sizes[name]
@@ -522,9 +502,10 @@ class FieldWizard(tk.Toplevel):
         try:
             with open(self._config_path, 'w', encoding='utf-8') as f:
                 json.dump(self._config, f, ensure_ascii=False, indent=2)
-            messagebox.showinfo('Gespeichert',
-                                'Alle Einstellungen wurden in config.json gespeichert.',
-                                parent=self)
+            messagebox.showinfo(
+                'Gespeichert',
+                'Alle Einstellungen wurden in config.json gespeichert.',
+                parent=self)
         except Exception as exc:
             messagebox.showerror('Fehler beim Speichern', str(exc), parent=self)
             return
