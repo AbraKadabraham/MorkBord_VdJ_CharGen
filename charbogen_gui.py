@@ -203,7 +203,12 @@ class CharacterGenerator:
                     if line:
                         bbox = draw.textbbox((0, 0), line, font=font)
                         width = bbox[2] - bbox[0]
-                        x = x1 + 4 if align == 'left' else x1 + (max_width - width) // 2
+                        if align == 'center':
+                            x = x1 + (max_width - width) // 2
+                        elif align == 'right':
+                            x = x2 - width - 4
+                        else:  # left (default)
+                            x = x1 + 4
                         draw.text((x, y), line, fill='black', font=font)
                     y += line_height
                 return

@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+
+# Build / Distribution
+build/
+dist/
+*.spec.bak
+
+# Virtual Environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Output – Ordner bleibt (via .gitkeep), generierte Dateien nicht einchecken
+Output/*
+!Output/.gitkeep

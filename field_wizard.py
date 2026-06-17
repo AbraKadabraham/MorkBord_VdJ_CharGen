@@ -170,7 +170,11 @@ class FieldWizard(tk.Toplevel):
         self._draw_new_for   = None
         self._adj_active     = None
 
-        self._load_image()
+        # Bild laden – bei Fehler Dialog sauber schließen
+        if not self._load_image():
+            self.destroy()
+            return
+
         self._build_ui()
         self._draw_all()
 
@@ -179,8 +183,26 @@ class FieldWizard(tk.Toplevel):
     # ------------------------------------------------------------------
 
     def _load_image(self):
-        path = self._app_dir / self._config['template_file']
-        self._orig  = Image.open(path).convert('RGB')
+        """Lädt das Template-Bild. Gibt True zurück wenn erfolgreich, sonst False."""
+        path = self._app_dir / self._config.get('template_file', '')
+        try:
+            self._orig = Image.open(path).convert('RGB')
+        except FileNotFoundError:
+            messagebox.showerror(
+                'Template nicht gefunden',
+                f'Das Template-Bild wurde nicht gefunden:\n{path}\n\n'
+                'Bitte zuerst in den Einstellungen den korrekten Pfad hinterlegen.',
+                parent=self,
+            )
+            return False
+        except Exception as exc:
+            messagebox.showerror(
+                'Fehler beim Laden des Templates',
+                f'Das Template-Bild konnte nicht geöffnet werden:\n{exc}',
+                parent=self,
+            )
+            return False
+
         self._scale = min(
             _CANVAS_MAX_W / self._orig.width,
             _CANVAS_MAX_H / self._orig.height,
@@ -190,6 +212,7 @@ class FieldWizard(tk.Toplevel):
         ch = int(self._orig.height * self._scale)
         self._tk_img    = ImageTk.PhotoImage(self._orig.resize((cw, ch), Image.LANCZOS))
         self._cw, self._ch = cw, ch
+        return True
 
     # ------------------------------------------------------------------
     # UI aufbauen
@@ -246,7 +269,7 @@ class FieldWizard(tk.Toplevel):
             row=1, column=0, sticky='w', pady=(6, 0))
         self._align_var = tk.StringVar(value='left')
         ttk.Combobox(fset_frame, textvariable=self._align_var,
-                     values=['left', 'center'], width=8,
+                     values=['left', 'center', 'right'], width=8,
                      state='readonly').grid(row=1, column=1, sticky='w', pady=(6, 0))
         self._align_var.trace_add('write', lambda *_: self._on_align_change())
 
@@ -593,7 +616,7 @@ class FieldWizard(tk.Toplevel):
         self._redraw_drag  = {}
         self._canvas.config(cursor='crosshair')
         self._status_var.set(
-            f'Neu aufziehen für „{self._selected_field}" – Box auf dem Bogen aufziehen.')
+            f'Neu aufziehen für \u201e{self._selected_field}\u201c – Box auf dem Bogen aufziehen.')
 
     # ------------------------------------------------------------------
     # Attitude-Interaktion
