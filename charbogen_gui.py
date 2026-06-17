@@ -123,7 +123,6 @@ class CharacterGenerator:
             self.columns = self.load_csv_columns(self.csv_path)
 
     def _is_mb_system(self) -> bool:
-        """Gibt True zurück wenn die aktive Config zum MB-System gehört."""
         cfg_file = self.config.get('csv_file', '')
         tmpl_file = self.config.get('template_file', '')
         return 'mb' in Path(cfg_file).stem.lower() or 'mb' in Path(tmpl_file).stem.lower()
@@ -158,7 +157,6 @@ class CharacterGenerator:
         return columns
 
     def _needed_columns(self):
-        """Gibt alle benötigten CSV-Spaltennamen zurück."""
         needed = set()
         for v in self.field_mapping.values():
             if v is None:
@@ -193,7 +191,6 @@ class CharacterGenerator:
         return pools
 
     def find_font(self, size, font_file=''):
-        """Gibt ein ImageFont zurück. Wenn font_file angegeben, wird diese bevorzugt."""
         if font_file:
             path = _find_font_path(font_file, APP_DIR)
             if path:
@@ -235,7 +232,6 @@ class CharacterGenerator:
 
     def fit_and_draw(self, draw, box, text, start_size, align='left', font_file='',
                      valign='top'):
-        """Zeichnet Text in eine Box mit automatischer Schriftgrößenanpassung."""
         x1, y1, x2, y2 = box
         max_width  = x2 - x1
         max_height = y2 - y1
@@ -286,25 +282,17 @@ class CharacterGenerator:
                               desc_font_file=''):
         """Zeichnet Schriftrolle-Einträge in eine Box.
 
-        Jeder Eintrag besteht aus:
-          - Überschrift  z.B. "Heilige Schriftrolle 'Brechung':"
-            in heading_size (wird automatisch reduziert wenn nötig)
-          - Beschreibung darunter, in heading_size * desc_size_ratio
-            (aber mindestens min_font_size)
-
-        scroll_entries: list of (heading_text, desc_text)
-        heading_size  : Ausgangsschriftgröße für Überschriften
-        desc_size_ratio: Faktor für Beschreibungsschriftgröße (z.B. 0.8)
+        Jeder Eintrag: Überschrift (z.B. "Heilige Schriftrolle ‘Brechung’:")
+        in heading_size, danach Beschreibung in heading_size * desc_size_ratio.
         """
         x1, y1, x2, y2 = box
-        max_width  = x2 - x1
-        max_height = y2 - y1
-        min_size   = self.config.get('min_font_size', 14)
+        max_width    = x2 - x1
+        max_height   = y2 - y1
+        min_size     = self.config.get('min_font_size', 14)
         line_spacing = self.config.get('line_spacing', 6)
         top_padding  = self.config.get('top_padding', 4)
         entry_gap    = self.config.get('scroll_entry_gap', 8)
 
-        # Iterativ Schriftgröße verkleinern bis alles passt
         h_size = heading_size
         while h_size >= min_size:
             d_size = max(min_size, int(h_size * desc_size_ratio))
@@ -316,20 +304,17 @@ class CharacterGenerator:
             d_lh = (draw.textbbox((0, 0), 'Ag', font=d_font)[3]
                     - draw.textbbox((0, 0), 'Ag', font=d_font)[1]) + line_spacing
 
-            # Gesamthöhe aller Einträge berechnen
             total_h = top_padding
             segments = []
             for idx, (heading, desc) in enumerate(scroll_entries):
                 h_lines = self.wrap_text(draw, heading, h_font, max_width - 8)
-                d_lines = self.wrap_text(draw, desc,    d_font, max_width - 8) if desc else []
-                entry_h = len(h_lines) * h_lh + len(d_lines) * d_lh
+                d_lines = self.wrap_text(draw, desc, d_font, max_width - 8) if desc else []
                 if idx > 0:
                     total_h += entry_gap
-                total_h += entry_h
+                total_h += len(h_lines) * h_lh + len(d_lines) * d_lh
                 segments.append((h_lines, d_lines))
 
             if total_h <= max_height:
-                # Alles passt – jetzt zeichnen
                 y = y1 + top_padding
                 for idx, (h_lines, d_lines) in enumerate(segments):
                     if idx > 0:
@@ -387,7 +372,6 @@ class CharacterGenerator:
     # ------------------------------------------------------------------
 
     def generate_mb_stats(self, rng: random.Random) -> dict:
-        """Erzeugt Attribute, HP, Omen und Silber nach den MB-Bare-Bones-Regeln."""
         attr_names = ['Stärke', 'Geschick', 'Präsenz', 'Zähigkeit']
         bonus_indices = set(rng.sample(range(4), 2))
         mods = {}
@@ -450,27 +434,46 @@ class CharacterGenerator:
                 write_to    = block.get('write_to', '')
                 if not write_to:
                     continue
-                field_has_content = bool(character.get(check_field, '').strip())
+                field_has_content = bool(character.get(check_field, ''))
+                # Scroll-Felder: Inhalt ist eine Liste, leer = keine Einträge
+                val = character.get(check_field)
+                if isinstance(val, list):
+                    field_has_content = len(val) > 0
+                else:
+                    field_has_content = bool((val or '').strip())
                 chosen_col = then_col if field_has_content else else_col
                 if chosen_col in pools:
                     character[write_to] = pools[chosen_col].draw()
                 else:
                     character[write_to] = ''
 
-        # ── 3. Schriftrolle-Felder ────────────────────────────────────────
+        # ── 3. Schriftrolle-Felder (bedingt) ──────────────────────────────
+        # WICHTIG: scroll_fields werden erst NACH field_mapping + conditional_logic
+        # befüllt, damit only_if_field_contains auf bereits gezogene Felder prüfen kann.
         for field_name, scroll_def in self.scroll_fields.items():
             entries = []
             for scroll_entry in scroll_def.get('scrolls', []):
                 name_col  = scroll_entry['name_column']
                 desc_col  = scroll_entry['desc_column']
                 label     = scroll_entry.get('label', name_col)
+
+                # Bedingung: nur ziehen wenn check_field den trigger_text enthält
+                check_field   = scroll_entry.get('only_if_field_contains', {}).get('field', '')
+                trigger_text  = scroll_entry.get('only_if_field_contains', {}).get('contains', '')
+                if check_field and trigger_text:
+                    field_value = character.get(check_field, '')
+                    if isinstance(field_value, list):
+                        field_value = ' '.join(str(x) for x in field_value)
+                    if trigger_text.lower() not in field_value.lower():
+                        continue  # Bedingung nicht erfüllt – diesen Eintrag überspringen
+
                 if name_col in pools:
                     scroll_name = pools[name_col].draw()
                     desc_text   = pools[desc_col].draw() if desc_col in pools else ''
                     if scroll_name:
                         heading = f"{label} \u2018{scroll_name}\u2019:"
                         entries.append((heading, desc_text))
-            # Als Sonderschlüssel speichern: Tupel-Liste statt String
+
             character[field_name] = entries
 
         # ── 4. MÖRK BORG: regelbasierte Stats ────────────────────────────
@@ -493,7 +496,6 @@ class CharacterGenerator:
             font_file = layout.get('font_file', '')
             value     = character.get(field_name)
 
-            # Schriftrolle-Feld: Wert ist eine Liste von (heading, desc)-Tupeln
             if field_name in self.scroll_fields:
                 entries = value if isinstance(value, list) else []
                 if entries:
@@ -588,8 +590,6 @@ class CharacterGenerator:
 # ---------------------------------------------------------------------------
 
 class SettingsDialog(tk.Toplevel):
-    """Modaler Dialog für Dateipfade und Zugang zum Feld-Wizard."""
-
     def __init__(self, parent, config, config_path, reload_callback):
         super().__init__(parent)
         self.title('Einstellungen')

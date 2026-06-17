@@ -41,12 +41,20 @@
         {
           "name_column": "Heilige Schriftrollen",
           "desc_column": "Heilige Schriftrollen Beschreibung",
-          "label": "Heilige Schriftrolle"
+          "label": "Heilige Schriftrolle",
+          "only_if_field_contains": {
+            "field": "Ausrüstung",
+            "contains": "züfällige heilige Schriftrolle"
+          }
         },
         {
           "name_column": "Unreine Schriftrollen",
           "desc_column": "Unreine Schriftrollen Beschreibung",
-          "label": "Unreine Schriftrolle"
+          "label": "Unreine Schriftrolle",
+          "only_if_field_contains": {
+            "field": "Ausrüstung",
+            "contains": "züfällige unreine Schriftrolle"
+          }
         }
       ]
     }
