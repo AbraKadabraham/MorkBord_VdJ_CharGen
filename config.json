@@ -4,6 +4,7 @@
   "min_font_size": 14,
   "line_spacing": 6,
   "top_padding": 4,
+  "scroll_entry_gap": 8,
   "a4_size": [
     3508,
     2480
@@ -20,6 +21,22 @@
     "Art des Todes": "Art des Todes",
     "Akte / Notizen": null
   },
+  "scroll_fields": {
+    "Kräft": {
+      "scrolls": [
+        {
+          "name_column": "Heilige Schriftrollen",
+          "desc_column": "Heilige Schriftrollen Beschreibung",
+          "label": "Heilige Schriftrolle"
+        },
+        {
+          "name_column": "Unreine Schriftrollen",
+          "desc_column": "Unreine Schriftrollen Beschreibung",
+          "label": "Unreine Schriftrolle"
+        }
+      ]
+    }
+  },
   "field_layouts": {
     "Name": {
       "box": [
@@ -29,8 +46,7 @@
         250
       ],
       "font_size": 28,
-      "align": "left",
-      "valign": "middle"
+      "align": "left"
     },
     "Aussehen": {
       "box": [
@@ -40,8 +56,7 @@
         539
       ],
       "font_size": 22,
-      "align": "left",
-      "valign": "top"
+      "align": "left"
     },
     "Art des Todes": {
       "box": [
@@ -51,8 +66,7 @@
         918
       ],
       "font_size": 22,
-      "align": "left",
-      "valign": "top"
+      "align": "left"
     },
     "Offene Schuld": {
       "box": [
@@ -62,8 +76,7 @@
         530
       ],
       "font_size": 22,
-      "align": "left",
-      "valign": "top"
+      "align": "left"
     },
     "Eigenheiten": {
       "box": [
@@ -73,8 +86,7 @@
         897
       ],
       "font_size": 22,
-      "align": "left",
-      "valign": "top"
+      "align": "left"
     },
     "Akte / Notizen": {
       "box": [
@@ -84,8 +96,19 @@
         985
       ],
       "font_size": 22,
+      "align": "left"
+    },
+    "Kräft": {
+      "box": [
+        527,
+        347,
+        969,
+        897
+      ],
+      "font_size": 22,
       "align": "left",
-      "valign": "top"
+      "desc_size_ratio": 0.8,
+      "desc_font_file": ""
     }
   },
   "attitude_markers": {

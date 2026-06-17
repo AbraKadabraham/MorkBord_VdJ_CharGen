@@ -107,6 +107,7 @@ class CharacterGenerator:
         self.field_layouts = config['field_layouts']
         self.attitude = config.get('attitude_markers')
         self.conditional_logic = config.get('conditional_logic', {})
+        self.scroll_fields = config.get('scroll_fields', {})
         self.a4 = tuple(config['a4_size'])
         self.debug = config.get('debug', {})
 
@@ -157,7 +158,7 @@ class CharacterGenerator:
         return columns
 
     def _needed_columns(self):
-        """Gibt alle benötigten CSV-Spaltennamen zurück (aus field_mapping + conditional_logic)."""
+        """Gibt alle benötigten CSV-Spaltennamen zurück."""
         needed = set()
         for v in self.field_mapping.values():
             if v is None:
@@ -176,6 +177,11 @@ class CharacterGenerator:
                 col = block.get(key)
                 if col:
                     needed.add(col)
+        # Schriftrolle-Spalten einsammeln
+        for scroll_def in self.scroll_fields.values():
+            for entry in scroll_def.get('scrolls', []):
+                needed.add(entry['name_column'])
+                needed.add(entry['desc_column'])
         return needed
 
     def build_pools(self, rng):
@@ -194,7 +200,7 @@ class CharacterGenerator:
                 try:
                     return ImageFont.truetype(str(path), size=size)
                 except Exception:
-                    pass  # Fallthrough zu automatischer Suche
+                    pass
 
         candidates = [
             APP_DIR / 'fonts' / 'DejaVuSerif.ttf',
@@ -229,13 +235,7 @@ class CharacterGenerator:
 
     def fit_and_draw(self, draw, box, text, start_size, align='left', font_file='',
                      valign='top'):
-        """Zeichnet Text in eine Box mit automatischer Schriftgrößenanpassung.
-
-        Parameters
-        ----------
-        align  : horizontale Ausrichtung ('left' | 'center' | 'right')
-        valign : vertikale  Ausrichtung ('top'   | 'middle' | 'bottom')
-        """
+        """Zeichnet Text in eine Box mit automatischer Schriftgrößenanpassung."""
         x1, y1, x2, y2 = box
         max_width  = x2 - x1
         max_height = y2 - y1
@@ -263,7 +263,7 @@ class CharacterGenerator:
                     y = y1 + (max_height - total_height) // 2
                 elif valign == 'bottom':
                     y = y2 - total_height - top_padding
-                else:  # 'top' (default)
+                else:
                     y = y1 + top_padding
 
                 for line in all_lines:
@@ -274,12 +274,90 @@ class CharacterGenerator:
                             x = x1 + (max_width - width) // 2
                         elif align == 'right':
                             x = x2 - width - 4
-                        else:  # left
+                        else:
                             x = x1 + 4
                         draw.text((x, y), line, fill='black', font=font)
                     y += line_height
                 return
             size -= 1
+
+    def fit_and_draw_scrolls(self, draw, box, scroll_entries, heading_size,
+                              desc_size_ratio, align='left', font_file='',
+                              desc_font_file=''):
+        """Zeichnet Schriftrolle-Einträge in eine Box.
+
+        Jeder Eintrag besteht aus:
+          - Überschrift  z.B. "Heilige Schriftrolle 'Brechung':"
+            in heading_size (wird automatisch reduziert wenn nötig)
+          - Beschreibung darunter, in heading_size * desc_size_ratio
+            (aber mindestens min_font_size)
+
+        scroll_entries: list of (heading_text, desc_text)
+        heading_size  : Ausgangsschriftgröße für Überschriften
+        desc_size_ratio: Faktor für Beschreibungsschriftgröße (z.B. 0.8)
+        """
+        x1, y1, x2, y2 = box
+        max_width  = x2 - x1
+        max_height = y2 - y1
+        min_size   = self.config.get('min_font_size', 14)
+        line_spacing = self.config.get('line_spacing', 6)
+        top_padding  = self.config.get('top_padding', 4)
+        entry_gap    = self.config.get('scroll_entry_gap', 8)
+
+        # Iterativ Schriftgröße verkleinern bis alles passt
+        h_size = heading_size
+        while h_size >= min_size:
+            d_size = max(min_size, int(h_size * desc_size_ratio))
+            h_font = self.find_font(h_size, font_file)
+            d_font = self.find_font(d_size, desc_font_file or font_file)
+
+            h_lh = (draw.textbbox((0, 0), 'Ag', font=h_font)[3]
+                    - draw.textbbox((0, 0), 'Ag', font=h_font)[1]) + line_spacing
+            d_lh = (draw.textbbox((0, 0), 'Ag', font=d_font)[3]
+                    - draw.textbbox((0, 0), 'Ag', font=d_font)[1]) + line_spacing
+
+            # Gesamthöhe aller Einträge berechnen
+            total_h = top_padding
+            segments = []
+            for idx, (heading, desc) in enumerate(scroll_entries):
+                h_lines = self.wrap_text(draw, heading, h_font, max_width - 8)
+                d_lines = self.wrap_text(draw, desc,    d_font, max_width - 8) if desc else []
+                entry_h = len(h_lines) * h_lh + len(d_lines) * d_lh
+                if idx > 0:
+                    total_h += entry_gap
+                total_h += entry_h
+                segments.append((h_lines, d_lines))
+
+            if total_h <= max_height:
+                # Alles passt – jetzt zeichnen
+                y = y1 + top_padding
+                for idx, (h_lines, d_lines) in enumerate(segments):
+                    if idx > 0:
+                        y += entry_gap
+                    for line in h_lines:
+                        bbox  = draw.textbbox((0, 0), line, font=h_font)
+                        width = bbox[2] - bbox[0]
+                        if align == 'center':
+                            x = x1 + (max_width - width) // 2
+                        elif align == 'right':
+                            x = x2 - width - 4
+                        else:
+                            x = x1 + 4
+                        draw.text((x, y), line, fill='black', font=h_font)
+                        y += h_lh
+                    for line in d_lines:
+                        bbox  = draw.textbbox((0, 0), line, font=d_font)
+                        width = bbox[2] - bbox[0]
+                        if align == 'center':
+                            x = x1 + (max_width - width) // 2
+                        elif align == 'right':
+                            x = x2 - width - 4
+                        else:
+                            x = x1 + 4
+                        draw.text((x, y), line, fill='black', font=d_font)
+                        y += d_lh
+                return
+            h_size -= 1
 
     def draw_debug_overlay(self, draw):
         if not self.debug.get('enabled', False):
@@ -309,28 +387,16 @@ class CharacterGenerator:
     # ------------------------------------------------------------------
 
     def generate_mb_stats(self, rng: random.Random) -> dict:
-        """Erzeugt Attribute, HP, Omen und Silber nach den MB-Bare-Bones-Regeln.
-
-        - Stärke, Geschick, Präsenz, Zähigkeit: je 3d6 → Mod-Tabelle.
-          Zwei zufällig gewählte Attribute verwenden stattdessen 4d6-drop-lowest.
-        - Trefferpunkte: max(1, toughness_mod + d8)
-        - Omen: d2
-        - Silber: 2d6 × 10
-        """
+        """Erzeugt Attribute, HP, Omen und Silber nach den MB-Bare-Bones-Regeln."""
         attr_names = ['Stärke', 'Geschick', 'Präsenz', 'Zähigkeit']
-
-        # Zwei zufällige Attribute bekommen den 4d6-drop-lowest-Bonus
         bonus_indices = set(rng.sample(range(4), 2))
-
         mods = {}
         for i, name in enumerate(attr_names):
             mods[name] = _roll_ability(rng, use_4d6_drop=(i in bonus_indices))
-
         toughness_mod = mods['Zähigkeit']
         hp     = max(1, toughness_mod + rng.randint(1, 8))
         omen   = rng.randint(1, 2)
         silver = (rng.randint(1, 6) + rng.randint(1, 6)) * 10
-
         return {
             'Stärke':         _format_mod(mods['Stärke']),
             'Geschick':       _format_mod(mods['Geschick']),
@@ -391,7 +457,23 @@ class CharacterGenerator:
                 else:
                     character[write_to] = ''
 
-        # ── 3. MÖRK BORG: regelbasierte Stats (überschreiben null-Felder) ─
+        # ── 3. Schriftrolle-Felder ────────────────────────────────────────
+        for field_name, scroll_def in self.scroll_fields.items():
+            entries = []
+            for scroll_entry in scroll_def.get('scrolls', []):
+                name_col  = scroll_entry['name_column']
+                desc_col  = scroll_entry['desc_column']
+                label     = scroll_entry.get('label', name_col)
+                if name_col in pools:
+                    scroll_name = pools[name_col].draw()
+                    desc_text   = pools[desc_col].draw() if desc_col in pools else ''
+                    if scroll_name:
+                        heading = f"{label} \u2018{scroll_name}\u2019:"
+                        entries.append((heading, desc_text))
+            # Als Sonderschlüssel speichern: Tupel-Liste statt String
+            character[field_name] = entries
+
+        # ── 4. MÖRK BORG: regelbasierte Stats ────────────────────────────
         if self._is_mb_system():
             pool_rng = next(iter(pools.values())).rng if pools else random.Random()
             mb_stats = self.generate_mb_stats(pool_rng)
@@ -402,15 +484,36 @@ class CharacterGenerator:
     def render_sheet(self, character, rng):
         img  = Image.open(self.template_path).convert('RGB')
         draw = ImageDraw.Draw(img)
+
         for field_name, layout in self.field_layouts.items():
             box       = tuple(layout['box'])
             size      = layout['font_size']
             align     = layout.get('align',  'left')
             valign    = layout.get('valign', 'top')
             font_file = layout.get('font_file', '')
-            value     = character.get(field_name, '').strip()
-            if value:
-                self.fit_and_draw(draw, box, value, size, align, font_file, valign)
+            value     = character.get(field_name)
+
+            # Schriftrolle-Feld: Wert ist eine Liste von (heading, desc)-Tupeln
+            if field_name in self.scroll_fields:
+                entries = value if isinstance(value, list) else []
+                if entries:
+                    desc_size_ratio = layout.get('desc_size_ratio', 0.8)
+                    desc_font_file  = layout.get('desc_font_file', '')
+                    self.fit_and_draw_scrolls(
+                        draw, box, entries,
+                        heading_size=size,
+                        desc_size_ratio=desc_size_ratio,
+                        align=align,
+                        font_file=font_file,
+                        desc_font_file=desc_font_file,
+                    )
+            else:
+                if isinstance(value, str):
+                    text = value.strip()
+                else:
+                    text = str(value).strip() if value else ''
+                if text:
+                    self.fit_and_draw(draw, box, text, size, align, font_file, valign)
 
         if self.attitude:
             idx = rng.randrange(len(self.attitude['x_positions']))
