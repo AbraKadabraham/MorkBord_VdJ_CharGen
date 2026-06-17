@@ -4,7 +4,10 @@
   "min_font_size": 14,
   "line_spacing": 6,
   "top_padding": 4,
-  "a4_size": [3508, 2480],
+  "a4_size": [
+    3508,
+    2480
+  ],
   "a4_layout": {
     "margin": 90,
     "gap": 50
@@ -19,38 +22,75 @@
   },
   "field_layouts": {
     "Name": {
-      "box": [184, 196, 487, 244],
+      "box": [
+        183,
+        194,
+        486,
+        243
+      ],
       "font_size": 28,
       "align": "left"
     },
     "Aussehen": {
-      "box": [91, 351, 467, 545],
+      "box": [
+        90,
+        350,
+        466,
+        544
+      ],
       "font_size": 22,
       "align": "left"
     },
     "Art des Todes": {
-      "box": [91, 716, 467, 907],
+      "box": [
+        83,
+        702,
+        458,
+        898
+      ],
       "font_size": 22,
       "align": "left"
     },
     "Offene Schuld": {
-      "box": [1044, 351, 1407, 532],
+      "box": [
+        1032,
+        349,
+        1395,
+        532
+      ],
       "font_size": 22,
       "align": "left"
     },
     "Eigenheiten": {
-      "box": [1044, 710, 1407, 891],
+      "box": [
+        1036,
+        704,
+        1405,
+        898
+      ],
       "font_size": 22,
       "align": "left"
     },
     "Akte / Notizen": {
-      "box": [528, 900, 971, 988],
+      "box": [
+        527,
+        899,
+        970,
+        986
+      ],
       "font_size": 22,
       "align": "left"
     }
   },
   "attitude_markers": {
-    "x_positions": [1135, 1193, 1249, 1306, 1360, 1415],
+    "x_positions": [
+      1135,
+      1193,
+      1249,
+      1306,
+      1360,
+      1415
+    ],
     "y": 123,
     "radius": 23,
     "line_width": 3
