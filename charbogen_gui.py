@@ -248,9 +248,10 @@ class CharacterGenerator:
         a4_files = self.compose_a4_pages(rendered, output_dir, base_name)
         return single_files, a4_files
 
-    def generate_preview(self, seed=None):
+    def generate_preview(self, seed=None, pools=None):
         rng = random.Random(seed)
-        pools = self.build_pools(rng)
+        if pools is None:
+            pools = self.build_pools(rng)
         character = self.generate_character(pools)
         return self.render_sheet(character, rng)
 
@@ -264,6 +265,8 @@ class App(tk.Tk):
         self.preview_photo = None
         self.current_preview_seed = None
         self.last_auto_seed = None
+        self.preview_pools = None
+        self._prev_pool_seed = None
         self.debug_enabled = bool(self.generator.config.get('debug', {}).get('enabled', False))
         self._build_ui()
         self.refresh_preview()
@@ -334,7 +337,11 @@ class App(tk.Tk):
     def refresh_preview(self):
         try:
             seed, user_locked = self.determine_preview_seed()
-            img = self.generator.generate_preview(seed)
+            # Pool zurücksetzen wenn Seed manuell geändert wurde
+            if self.preview_pools is None or seed != self._prev_pool_seed:
+                self.preview_pools = self.generator.build_pools(random.Random(seed))
+                self._prev_pool_seed = seed
+            img = self.generator.generate_preview(seed, pools=self.preview_pools)
             self.current_preview_seed = seed
             self.seed_var.set(str(seed))
             if user_locked:
