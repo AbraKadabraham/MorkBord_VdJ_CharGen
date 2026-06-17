@@ -1,6 +1,6 @@
 {
-  "template_file": "Charbogen.jpg",
-  "csv_file": "RandomTables.csv",
+  "template_file": "Charbogen_VdJ.jpg",
+  "csv_file": "RandomTables_VdJ.csv",
   "min_font_size": 14,
   "line_spacing": 6,
   "top_padding": 4,
@@ -24,9 +24,9 @@
     "Name": {
       "box": [
         183,
-        194,
-        486,
-        243
+        191,
+        481,
+        250
       ],
       "font_size": 28,
       "align": "left"
@@ -34,39 +34,39 @@
     "Aussehen": {
       "box": [
         90,
-        350,
-        466,
-        544
+        347,
+        465,
+        539
       ],
       "font_size": 22,
       "align": "left"
     },
     "Art des Todes": {
       "box": [
-        83,
-        702,
-        458,
-        898
+        73,
+        706,
+        455,
+        918
       ],
       "font_size": 22,
       "align": "left"
     },
     "Offene Schuld": {
       "box": [
-        1032,
-        349,
-        1395,
-        532
+        1031,
+        347,
+        1393,
+        530
       ],
       "font_size": 22,
       "align": "left"
     },
     "Eigenheiten": {
       "box": [
-        1036,
-        704,
-        1405,
-        898
+        1035,
+        703,
+        1404,
+        897
       ],
       "font_size": 22,
       "align": "left"
@@ -74,9 +74,9 @@
     "Akte / Notizen": {
       "box": [
         527,
-        899,
-        970,
-        986
+        898,
+        969,
+        985
       ],
       "font_size": 22,
       "align": "left"
@@ -84,14 +84,14 @@
   },
   "attitude_markers": {
     "x_positions": [
-      1135,
+      1137,
       1193,
       1249,
       1306,
       1360,
       1415
     ],
-    "y": 123,
+    "y": 125,
     "radius": 23,
     "line_width": 3
   },
