@@ -17,10 +17,8 @@ SYSTEMS = {
     'Mörk Borg':              'config_mb.json',
 }
 
-# Erkennungsmerkmal für das MB-System
 MB_CONFIG_FILE = 'config_mb.json'
 
-# Umrechnungstabelle: Würfelsumme → Modifikator (MÖRK BORG)
 _ABILITY_MOD_TABLE = [
     (4,  -3),
     (6,  -2),
@@ -33,7 +31,6 @@ _ABILITY_MOD_TABLE = [
 
 
 def _sum_to_mod(total: int) -> int:
-    """Wandelt einen 3d6-Summenwert per MB-Tabelle in einen Modifikator um."""
     for threshold, mod in _ABILITY_MOD_TABLE:
         if total <= threshold:
             return mod
@@ -41,11 +38,6 @@ def _sum_to_mod(total: int) -> int:
 
 
 def _roll_ability(rng: random.Random, use_4d6_drop: bool = False) -> int:
-    """Würfelt ein Attribut und gibt den Modifikator zurück.
-
-    use_4d6_drop=True: 4d6, niedrigster Würfel fällt weg.
-    use_4d6_drop=False: normales 3d6.
-    """
     if use_4d6_drop:
         rolls = [rng.randint(1, 6) for _ in range(4)]
         total = sum(rolls) - min(rolls)
@@ -55,7 +47,6 @@ def _roll_ability(rng: random.Random, use_4d6_drop: bool = False) -> int:
 
 
 def _format_mod(mod: int) -> str:
-    """Formatiert einen Modifikator mit Vorzeichen: +2, 0, -1 …"""
     if mod > 0:
         return f'+{mod}'
     return str(mod)
@@ -175,7 +166,6 @@ class CharacterGenerator:
                 col = block.get(key)
                 if col:
                     needed.add(col)
-        # Schriftrolle-Spalten einsammeln
         for scroll_def in self.scroll_fields.values():
             for entry in scroll_def.get('scrolls', []):
                 needed.add(entry['name_column'])
@@ -280,11 +270,6 @@ class CharacterGenerator:
     def fit_and_draw_scrolls(self, draw, box, scroll_entries, heading_size,
                               desc_size_ratio, align='left', font_file='',
                               desc_font_file=''):
-        """Zeichnet Schriftrolle-Einträge in eine Box.
-
-        Jeder Eintrag: Überschrift (z.B. "Heilige Schriftrolle ‘Brechung’:")
-        in heading_size, danach Beschreibung in heading_size * desc_size_ratio.
-        """
         x1, y1, x2, y2 = box
         max_width    = x2 - x1
         max_height   = y2 - y1
@@ -367,10 +352,6 @@ class CharacterGenerator:
                 draw.text((x - 8, y + radius + 4), str(i),
                           fill=cross_color, font=label_font)
 
-    # ------------------------------------------------------------------
-    # MÖRK BORG: regelbasierte Attribut-Erzeugung
-    # ------------------------------------------------------------------
-
     def generate_mb_stats(self, rng: random.Random) -> dict:
         attr_names = ['Stärke', 'Geschick', 'Präsenz', 'Zähigkeit']
         bonus_indices = set(rng.sample(range(4), 2))
@@ -391,8 +372,6 @@ class CharacterGenerator:
             'Silber':         str(silver),
         }
 
-    # ------------------------------------------------------------------
-
     def generate_character(self, pools):
         character = {}
 
@@ -401,10 +380,22 @@ class CharacterGenerator:
             if csv_column is None:
                 character[field_name] = ''
             elif isinstance(csv_column, list):
-                separator = self.field_layouts.get(field_name, {}).get(
-                    'multi_column_separator', '\n')
-                parts = [pools[col].draw() for col in csv_column if col in pools]
-                character[field_name] = separator.join(p for p in parts if p)
+                layout    = self.field_layouts.get(field_name, {})
+                separator = layout.get('multi_column_separator', '\n')
+                # skip_values: Liste von Strings, die nach dem Ziehen ignoriert werden
+                # Vergleich case-insensitiv; Standard: ["nichts"] wenn skip_values nicht
+                # gesetzt, aber nur angewendet wenn das Feld skip_values explizit hat.
+                skip_raw  = layout.get('skip_values', [])
+                skip_set  = {v.strip().lower() for v in skip_raw}
+                parts = []
+                for col in csv_column:
+                    if col in pools:
+                        val = pools[col].draw()
+                        if skip_set and val.strip().lower() in skip_set:
+                            continue  # diesen Wert überspringen
+                        if val:
+                            parts.append(val)
+                character[field_name] = separator.join(parts)
             else:
                 character[field_name] = pools[csv_column].draw()
 
@@ -434,8 +425,6 @@ class CharacterGenerator:
                 write_to    = block.get('write_to', '')
                 if not write_to:
                     continue
-                field_has_content = bool(character.get(check_field, ''))
-                # Scroll-Felder: Inhalt ist eine Liste, leer = keine Einträge
                 val = character.get(check_field)
                 if isinstance(val, list):
                     field_has_content = len(val) > 0
@@ -448,8 +437,6 @@ class CharacterGenerator:
                     character[write_to] = ''
 
         # ── 3. Schriftrolle-Felder (bedingt) ──────────────────────────────
-        # WICHTIG: scroll_fields werden erst NACH field_mapping + conditional_logic
-        # befüllt, damit only_if_field_contains auf bereits gezogene Felder prüfen kann.
         for field_name, scroll_def in self.scroll_fields.items():
             entries = []
             for scroll_entry in scroll_def.get('scrolls', []):
@@ -457,7 +444,6 @@ class CharacterGenerator:
                 desc_col  = scroll_entry['desc_column']
                 label     = scroll_entry.get('label', name_col)
 
-                # Bedingung: nur ziehen wenn check_field den trigger_text enthält
                 check_field   = scroll_entry.get('only_if_field_contains', {}).get('field', '')
                 trigger_text  = scroll_entry.get('only_if_field_contains', {}).get('contains', '')
                 if check_field and trigger_text:
@@ -465,7 +451,7 @@ class CharacterGenerator:
                     if isinstance(field_value, list):
                         field_value = ' '.join(str(x) for x in field_value)
                     if trigger_text.lower() not in field_value.lower():
-                        continue  # Bedingung nicht erfüllt – diesen Eintrag überspringen
+                        continue
 
                 if name_col in pools:
                     scroll_name = pools[name_col].draw()
@@ -584,10 +570,6 @@ class CharacterGenerator:
         character = self.generate_character(pools)
         return self.render_sheet(character, rng)
 
-
-# ---------------------------------------------------------------------------
-# Einstellungen-Dialog
-# ---------------------------------------------------------------------------
 
 class SettingsDialog(tk.Toplevel):
     def __init__(self, parent, config, config_path, reload_callback):
@@ -710,10 +692,6 @@ class SettingsDialog(tk.Toplevel):
         self.destroy()
         self._reload_callback()
 
-
-# ---------------------------------------------------------------------------
-# Haupt-App
-# ---------------------------------------------------------------------------
 
 class App(tk.Tk):
     def __init__(self, generator, initial_system=None):

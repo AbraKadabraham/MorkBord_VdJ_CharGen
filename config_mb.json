@@ -112,6 +112,7 @@
       "font_size": 45,
       "align": "left",
       "multi_column_separator": "\n\n",
+      "skip_values": ["nichts"],
       "valign": "top"
     },
     "Stärke": {
