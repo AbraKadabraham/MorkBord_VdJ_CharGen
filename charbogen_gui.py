@@ -71,12 +71,10 @@ class CharacterGenerator:
                 break
             except UnicodeDecodeError as e:
                 last_error = e
-
         if rows is None:
             raise ValueError(
-                f'CSV konnte nicht gelesen werden. Bitte als UTF-8 oder ANSI/Windows-1252 speichern. Letzter Fehler: {last_error}'
+                f'CSV konnte nicht gelesen werden. Letzter Fehler: {last_error}'
             )
-
         columns = {}
         for row in rows:
             for key, value in row.items():
@@ -197,8 +195,8 @@ class CharacterGenerator:
         cy = self.attitude['y']
         r = self.attitude['radius']
         line_width = self.attitude['line_width']
-        draw.line((cx-r, cy-r, cx+r, cy+r), fill='black', width=line_width)
-        draw.line((cx-r, cy+r, cx+r, cy-r), fill='black', width=line_width)
+        draw.line((cx - r, cy - r, cx + r, cy + r), fill='black', width=line_width)
+        draw.line((cx - r, cy + r, cx + r, cy - r), fill='black', width=line_width)
         self.draw_debug_overlay(draw)
         return img
 
@@ -258,6 +256,146 @@ class CharacterGenerator:
         return self.render_sheet(character, rng)
 
 
+# ---------------------------------------------------------------------------
+# Einstellungen-Dialog
+# ---------------------------------------------------------------------------
+
+class SettingsDialog(tk.Toplevel):
+    """Modaler Dialog für Dateipfade und Zugang zum Feld-Wizard."""
+
+    def __init__(self, parent, config, config_path, reload_callback):
+        super().__init__(parent)
+        self.title('Einstellungen')
+        self.resizable(False, False)
+        self.grab_set()
+
+        self._config = config
+        self._config_path = Path(config_path)
+        self._app_dir = self._config_path.parent
+        self._reload_callback = reload_callback
+        self._parent = parent
+
+        self._template_var = tk.StringVar(value=config.get('template_file', ''))
+        self._csv_var = tk.StringVar(value=config.get('csv_file', ''))
+
+        self._build()
+
+    def _build(self):
+        pad = dict(padx=12, pady=6)
+
+        # ── Dateipfade ──────────────────────────────────────────────────
+        paths_frame = ttk.LabelFrame(self, text='Dateipfade', padding=10)
+        paths_frame.pack(fill='x', padx=14, pady=(14, 6))
+
+        ttk.Label(paths_frame, text='Template-Bild (JPG/PNG):').grid(
+            row=0, column=0, sticky='w', pady=(0, 2))
+        ttk.Entry(paths_frame, textvariable=self._template_var, width=52).grid(
+            row=1, column=0, sticky='ew', padx=(0, 8))
+        ttk.Button(paths_frame, text='📂 Durchsuchen',
+                   command=self._browse_template).grid(row=1, column=1)
+
+        ttk.Label(paths_frame, text='CSV-Datei (Zufallstabellen):').grid(
+            row=2, column=0, sticky='w', pady=(10, 2))
+        ttk.Entry(paths_frame, textvariable=self._csv_var, width=52).grid(
+            row=3, column=0, sticky='ew', padx=(0, 8))
+        ttk.Button(paths_frame, text='📂 Durchsuchen',
+                   command=self._browse_csv).grid(row=3, column=1)
+
+        ttk.Label(
+            paths_frame,
+            text='Pfade können relativ zum Programmordner oder absolut sein.',
+            foreground='gray'
+        ).grid(row=4, column=0, columnspan=2, sticky='w', pady=(6, 0))
+
+        # ── Felder anpassen ─────────────────────────────────────────────
+        fields_frame = ttk.LabelFrame(self, text='Felder & Marker', padding=10)
+        fields_frame.pack(fill='x', padx=14, pady=6)
+
+        ttk.Label(
+            fields_frame,
+            text='Position und Größe aller Textfelder sowie die Attitude-Marker\n'
+                 'können visuell auf dem Bogen eingestellt werden.'
+        ).pack(anchor='w', pady=(0, 8))
+
+        ttk.Button(
+            fields_frame,
+            text='🗺  Felder anpassen …',
+            command=self._open_wizard
+        ).pack(anchor='w')
+
+        # ── Buttons ──────────────────────────────────────────────────────
+        btn_frame = ttk.Frame(self, padding=(12, 8))
+        btn_frame.pack(fill='x')
+        ttk.Button(btn_frame, text='Abbrechen',
+                   command=self.destroy).pack(side='right', padx=(6, 0))
+        ttk.Button(btn_frame, text='💾  Speichern',
+                   command=self._save).pack(side='right')
+
+    def _browse_template(self):
+        path = filedialog.askopenfilename(
+            parent=self,
+            title='Template-Bild auswählen',
+            filetypes=[('Bilder', '*.jpg *.jpeg *.png *.bmp'), ('Alle Dateien', '*.*')],
+            initialdir=self._app_dir,
+        )
+        if path:
+            try:
+                self._template_var.set(str(Path(path).relative_to(self._app_dir)))
+            except ValueError:
+                self._template_var.set(path)
+
+    def _browse_csv(self):
+        path = filedialog.askopenfilename(
+            parent=self,
+            title='CSV-Datei auswählen',
+            filetypes=[('CSV-Dateien', '*.csv'), ('Alle Dateien', '*.*')],
+            initialdir=self._app_dir,
+        )
+        if path:
+            try:
+                self._csv_var.set(str(Path(path).relative_to(self._app_dir)))
+            except ValueError:
+                self._csv_var.set(path)
+
+    def _open_wizard(self):
+        """Öffnet den Feld-Wizard; nach Speichern wird config neu geladen."""
+        FieldWizard(
+            parent=self,
+            config=self._config,
+            config_path=self._config_path,
+            reload_callback=self._after_wizard_save,
+        )
+
+    def _after_wizard_save(self):
+        """Nach Wizard-Speichern: config neu einlesen + Pfad-Felder aktualisieren."""
+        self._reload_callback()
+        # config wurde möglicherweise verändert – Pfade aktuell halten
+        try:
+            with open(self._config_path, 'r', encoding='utf-8') as f:
+                fresh = json.load(f)
+            self._template_var.set(fresh.get('template_file', self._template_var.get()))
+            self._csv_var.set(fresh.get('csv_file', self._csv_var.get()))
+            self._config = fresh
+        except Exception:
+            pass
+
+    def _save(self):
+        self._config['template_file'] = self._template_var.get().strip()
+        self._config['csv_file'] = self._csv_var.get().strip()
+        try:
+            with open(self._config_path, 'w', encoding='utf-8') as f:
+                json.dump(self._config, f, ensure_ascii=False, indent=2)
+        except Exception as exc:
+            messagebox.showerror('Fehler beim Speichern', str(exc), parent=self)
+            return
+        self.destroy()
+        self._reload_callback()
+
+
+# ---------------------------------------------------------------------------
+# Haupt-App
+# ---------------------------------------------------------------------------
+
 class App(tk.Tk):
     def __init__(self, generator):
         super().__init__()
@@ -282,33 +420,42 @@ class App(tk.Tk):
 
         ttk.Label(controls, text='Seed:').grid(row=0, column=0, sticky='w', padx=(0, 6))
         self.seed_var = tk.StringVar()
-        ttk.Entry(controls, textvariable=self.seed_var, width=20).grid(row=0, column=1, sticky='w', padx=(0, 12))
+        ttk.Entry(controls, textvariable=self.seed_var, width=20).grid(
+            row=0, column=1, sticky='w', padx=(0, 12))
 
-        ttk.Button(controls, text='Aktualisieren', command=self.refresh_preview).grid(row=0, column=2, sticky='w', padx=(0, 12))
+        ttk.Button(controls, text='Aktualisieren',
+                   command=self.refresh_preview).grid(row=0, column=2, sticky='w', padx=(0, 12))
 
-        ttk.Label(controls, text='Anzahl Bögen:').grid(row=0, column=3, sticky='w', padx=(12, 6))
+        ttk.Label(controls, text='Anzahl Bögen:').grid(
+            row=0, column=3, sticky='w', padx=(12, 6))
         self.count_var = tk.StringVar(value='4')
-        ttk.Entry(controls, textvariable=self.count_var, width=10).grid(row=0, column=4, sticky='w', padx=(0, 12))
+        ttk.Entry(controls, textvariable=self.count_var, width=10).grid(
+            row=0, column=4, sticky='w', padx=(0, 12))
 
-        ttk.Button(controls, text='Generieren', command=self.generate_files).grid(row=0, column=5, sticky='w', padx=(0, 12))
+        ttk.Button(controls, text='Generieren',
+                   command=self.generate_files).grid(row=0, column=5, sticky='w', padx=(0, 12))
 
-        # Wizard-Button (immer sichtbar)
+        # Einstellungen-Button (ersetzt den direkten Wizard-Button)
         ttk.Button(
-            controls, text='🗺  Felder anpassen',
-            command=self.open_field_wizard
+            controls, text='⚙  Einstellungen',
+            command=self.open_settings
         ).grid(row=0, column=6, sticky='w', padx=(12, 0))
 
         if self.debug_enabled:
-            ttk.Button(controls, text='JSON neu einlesen', command=self.reload_config).grid(row=0, column=7, sticky='w', padx=(6, 0))
+            ttk.Button(controls, text='JSON neu einlesen',
+                       command=self.reload_config).grid(
+                row=0, column=7, sticky='w', padx=(6, 0))
 
-        info_text = 'Vorschau zeigt immer einen zufällig erzeugten Bogen. Das Seed-Feld zeigt den aktuell angezeigten Vorschau-Seed und kann auch manuell gesetzt werden.'
+        info_text = (
+            'Vorschau zeigt immer einen zufällig erzeugten Bogen. '
+            'Das Seed-Feld zeigt den aktuell angezeigten Vorschau-Seed und kann auch manuell gesetzt werden.'
+        )
         if self.debug_enabled:
             info_text += ' Debug-Modus aktiv: Feldrahmen und Marker werden eingeblendet.'
         ttk.Label(main, text=info_text).pack(fill='x', pady=(0, 10))
 
         preview_frame = ttk.LabelFrame(main, text='Vorschau', padding=10)
         preview_frame.pack(fill='both', expand=True)
-
         self.preview_label = ttk.Label(preview_frame)
         self.preview_label.pack(fill='both', expand=True)
 
@@ -368,7 +515,8 @@ class App(tk.Tk):
         try:
             config = load_config()
             self.generator.reload_from_config(config)
-            self.debug_enabled = bool(self.generator.config.get('debug', {}).get('enabled', False))
+            self.debug_enabled = bool(
+                self.generator.config.get('debug', {}).get('enabled', False))
             self.preview_pools = None
             self._prev_pool_seed = None
             self.refresh_preview()
@@ -376,9 +524,9 @@ class App(tk.Tk):
         except Exception as e:
             messagebox.showerror('Fehler beim Neueinlesen', str(e))
 
-    def open_field_wizard(self):
-        """Öffnet den Feld-Wizard; nach Speichern wird config automatisch neu geladen."""
-        FieldWizard(
+    def open_settings(self):
+        """Öffnet den Einstellungen-Dialog."""
+        SettingsDialog(
             parent=self,
             config=self.generator.config,
             config_path=CONFIG_PATH,
@@ -400,9 +548,14 @@ class App(tk.Tk):
             return
 
         try:
-            single_files, a4_files = self.generator.generate_batch(count, seed, target_dir)
-            self.status_var.set(f'Erstellt: {len(single_files)} Einzeldateien, {len(a4_files)} A4-Seiten in {target_dir}')
-            messagebox.showinfo('Fertig', f'{len(single_files)} Bögen und {len(a4_files)} A4-Seiten wurden gespeichert.')
+            single_files, a4_files = self.generator.generate_batch(
+                count, seed, target_dir)
+            self.status_var.set(
+                f'Erstellt: {len(single_files)} Einzeldateien, '
+                f'{len(a4_files)} A4-Seiten in {target_dir}')
+            messagebox.showinfo(
+                'Fertig',
+                f'{len(single_files)} Bögen und {len(a4_files)} A4-Seiten wurden gespeichert.')
         except Exception as e:
             messagebox.showerror('Fehler', str(e))
 
