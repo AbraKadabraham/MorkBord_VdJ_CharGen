@@ -47,6 +47,8 @@ class ColumnPool:
 
 class CharacterGenerator:
     def __init__(self, config):
+        self.columns = {}
+        self.missing_files = []
         self.reload_from_config(config)
 
     def reload_from_config(self, config):
@@ -58,7 +60,22 @@ class CharacterGenerator:
         self.attitude = config['attitude_markers']
         self.a4 = tuple(config['a4_size'])
         self.debug = config.get('debug', {})
-        self.columns = self.load_csv_columns(self.csv_path)
+
+        # Fehlende Dateien sammeln – kein Crash
+        self.missing_files = []
+        if not self.template_path.exists():
+            self.missing_files.append(('Template-Bild', str(self.template_path)))
+        if not self.csv_path.exists():
+            self.missing_files.append(('CSV-Datei', str(self.csv_path)))
+
+        if not self.csv_path.exists():
+            self.columns = {}
+        else:
+            self.columns = self.load_csv_columns(self.csv_path)
+
+    def is_ready(self):
+        """True wenn alle benötigten Dateien vorhanden sind."""
+        return len(self.missing_files) == 0
 
     def load_csv_columns(self, csv_path):
         encodings = ['utf-8-sig', 'utf-8', 'cp1252', 'latin-1']
@@ -281,8 +298,6 @@ class SettingsDialog(tk.Toplevel):
         self._build()
 
     def _build(self):
-        pad = dict(padx=12, pady=6)
-
         # ── Dateipfade ──────────────────────────────────────────────────
         paths_frame = ttk.LabelFrame(self, text='Dateipfade', padding=10)
         paths_frame.pack(fill='x', padx=14, pady=(14, 6))
@@ -369,7 +384,6 @@ class SettingsDialog(tk.Toplevel):
     def _after_wizard_save(self):
         """Nach Wizard-Speichern: config neu einlesen + Pfad-Felder aktualisieren."""
         self._reload_callback()
-        # config wurde möglicherweise verändert – Pfade aktuell halten
         try:
             with open(self._config_path, 'r', encoding='utf-8') as f:
                 fresh = json.load(f)
@@ -408,12 +422,32 @@ class App(tk.Tk):
         self.preview_pools = None
         self._prev_pool_seed = None
         self.debug_enabled = bool(self.generator.config.get('debug', {}).get('enabled', False))
+        self._warning_bar = None
         self._build_ui()
-        self.refresh_preview()
+
+        if self.generator.is_ready():
+            self.refresh_preview()
+        else:
+            self._show_missing_files_warning()
+            # Einstellungen sofort öffnen damit der User die Pfade korrigieren kann
+            self.after(200, self.open_settings)
 
     def _build_ui(self):
         main = ttk.Frame(self, padding=12)
         main.pack(fill='both', expand=True)
+
+        # Warnungs-Banner (initial versteckt)
+        self._warning_bar = tk.Label(
+            main,
+            text='',
+            background='#8b1a1a',
+            foreground='white',
+            font=('TkDefaultFont', 10, 'bold'),
+            anchor='w',
+            padx=10,
+            pady=6,
+        )
+        # wird nur eingeblendet wenn nötig
 
         controls = ttk.Frame(main)
         controls.pack(fill='x', pady=(0, 10))
@@ -435,7 +469,6 @@ class App(tk.Tk):
         ttk.Button(controls, text='Generieren',
                    command=self.generate_files).grid(row=0, column=5, sticky='w', padx=(0, 12))
 
-        # Einstellungen-Button (ersetzt den direkten Wizard-Button)
         ttk.Button(
             controls, text='⚙  Einstellungen',
             command=self.open_settings
@@ -462,6 +495,30 @@ class App(tk.Tk):
         self.status_var = tk.StringVar(value='Bereit.')
         ttk.Label(main, textvariable=self.status_var).pack(fill='x', pady=(10, 0))
 
+    # ------------------------------------------------------------------
+    # Warnungs-Banner
+    # ------------------------------------------------------------------
+
+    def _show_missing_files_warning(self):
+        missing = self.generator.missing_files
+        if not missing:
+            if self._warning_bar:
+                self._warning_bar.pack_forget()
+            return
+        lines = ['\u26a0  Fehlende Datei(en) – bitte in den Einstellungen verknüpfen:']
+        for label, path in missing:
+            lines.append(f'    {label}: {path}')
+        self._warning_bar.config(text='\n'.join(lines))
+        # Banner direkt unter dem Fenstertitel (oberhalb der Controls)
+        self._warning_bar.pack(fill='x', before=self.nametowidget(
+            self._warning_bar.winfo_parent()).winfo_children()[1])
+
+    def _hide_warning_bar(self):
+        if self._warning_bar:
+            self._warning_bar.pack_forget()
+
+    # ------------------------------------------------------------------
+
     def parse_seed(self):
         seed_text = self.seed_var.get().strip()
         if seed_text == '':
@@ -486,6 +543,10 @@ class App(tk.Tk):
         return typed_seed, True
 
     def refresh_preview(self):
+        if not self.generator.is_ready():
+            self.status_var.set(
+                'Vorschau nicht möglich – fehlende Dateien. Bitte Einstellungen öffnen.')
+            return
         try:
             seed, user_locked = self.determine_preview_seed()
             if self.preview_pools is None or seed != self._prev_pool_seed:
@@ -519,8 +580,14 @@ class App(tk.Tk):
                 self.generator.config.get('debug', {}).get('enabled', False))
             self.preview_pools = None
             self._prev_pool_seed = None
-            self.refresh_preview()
-            self.status_var.set('config.json wurde neu eingelesen.')
+            if self.generator.is_ready():
+                self._hide_warning_bar()
+                self.refresh_preview()
+                self.status_var.set('config.json wurde neu eingelesen.')
+            else:
+                self._show_missing_files_warning()
+                self.status_var.set(
+                    'Konfiguration gespeichert – Dateien noch nicht gefunden.')
         except Exception as e:
             messagebox.showerror('Fehler beim Neueinlesen', str(e))
 
@@ -534,6 +601,12 @@ class App(tk.Tk):
         )
 
     def generate_files(self):
+        if not self.generator.is_ready():
+            messagebox.showwarning(
+                'Dateien fehlen',
+                'Bitte zuerst alle Dateien in den Einstellungen verknüpfen.',
+                parent=self)
+            return
         try:
             seed = self.parse_seed()
             count = int(self.count_var.get().strip())
