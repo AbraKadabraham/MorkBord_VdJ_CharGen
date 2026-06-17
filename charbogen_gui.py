@@ -12,6 +12,11 @@ from field_wizard import FieldWizard
 APP_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = APP_DIR / 'config.json'
 
+# Verfügbare Systeme – erweiterbar
+SYSTEMS = [
+    'Vorzimmer des Jenseits',
+]
+
 
 def next_free_path(directory, stem, suffix):
     directory = Path(directory)
@@ -61,7 +66,6 @@ class CharacterGenerator:
         self.a4 = tuple(config['a4_size'])
         self.debug = config.get('debug', {})
 
-        # Fehlende Dateien sammeln – kein Crash
         self.missing_files = []
         if not self.template_path.exists():
             self.missing_files.append(('Template-Bild', str(self.template_path)))
@@ -74,7 +78,6 @@ class CharacterGenerator:
             self.columns = self.load_csv_columns(self.csv_path)
 
     def is_ready(self):
-        """True wenn alle benötigten Dateien vorhanden sind."""
         return len(self.missing_files) == 0
 
     def load_csv_columns(self, csv_path):
@@ -415,7 +418,7 @@ class App(tk.Tk):
         super().__init__()
         self.generator = generator
         self.title('Charakterbogen Generator')
-        self.geometry('1180x920')
+        self.geometry('1180x960')
         self.preview_photo = None
         self.current_preview_seed = None
         self.last_auto_seed = None
@@ -429,14 +432,13 @@ class App(tk.Tk):
             self.refresh_preview()
         else:
             self._show_missing_files_warning()
-            # Einstellungen sofort öffnen damit der User die Pfade korrigieren kann
             self.after(200, self.open_settings)
 
     def _build_ui(self):
         main = ttk.Frame(self, padding=12)
         main.pack(fill='both', expand=True)
 
-        # Warnungs-Banner (initial versteckt)
+        # ── Warnungs-Banner (initial versteckt) ─────────────────────────
         self._warning_bar = tk.Label(
             main,
             text='',
@@ -447,53 +449,73 @@ class App(tk.Tk):
             padx=10,
             pady=6,
         )
-        # wird nur eingeblendet wenn nötig
 
-        controls = ttk.Frame(main)
-        controls.pack(fill='x', pady=(0, 10))
+        # ── Obere Leiste: System-Auswahl + Einstellungen ─────────────────
+        top_bar = ttk.Frame(main)
+        top_bar.pack(fill='x', pady=(0, 6))
 
-        ttk.Label(controls, text='Seed:').grid(row=0, column=0, sticky='w', padx=(0, 6))
-        self.seed_var = tk.StringVar()
-        ttk.Entry(controls, textvariable=self.seed_var, width=20).grid(
-            row=0, column=1, sticky='w', padx=(0, 12))
+        ttk.Label(top_bar, text='System:').pack(side='left', padx=(0, 6))
 
-        ttk.Button(controls, text='Aktualisieren',
-                   command=self.refresh_preview).grid(row=0, column=2, sticky='w', padx=(0, 12))
-
-        ttk.Label(controls, text='Anzahl Bögen:').grid(
-            row=0, column=3, sticky='w', padx=(12, 6))
-        self.count_var = tk.StringVar(value='4')
-        ttk.Entry(controls, textvariable=self.count_var, width=10).grid(
-            row=0, column=4, sticky='w', padx=(0, 12))
-
-        ttk.Button(controls, text='Generieren',
-                   command=self.generate_files).grid(row=0, column=5, sticky='w', padx=(0, 12))
+        self.system_var = tk.StringVar(value=SYSTEMS[0])
+        system_combo = ttk.Combobox(
+            top_bar,
+            textvariable=self.system_var,
+            values=SYSTEMS,
+            state='readonly',
+            width=28,
+        )
+        system_combo.pack(side='left', padx=(0, 12))
 
         ttk.Button(
-            controls, text='⚙  Einstellungen',
-            command=self.open_settings
-        ).grid(row=0, column=6, sticky='w', padx=(12, 0))
+            top_bar,
+            text='⚙  Einstellungen',
+            command=self.open_settings,
+        ).pack(side='left')
 
-        if self.debug_enabled:
-            ttk.Button(controls, text='JSON neu einlesen',
-                       command=self.reload_config).grid(
-                row=0, column=7, sticky='w', padx=(6, 0))
-
+        # ── Info-Text ────────────────────────────────────────────────────
         info_text = (
             'Vorschau zeigt immer einen zufällig erzeugten Bogen. '
             'Das Seed-Feld zeigt den aktuell angezeigten Vorschau-Seed und kann auch manuell gesetzt werden.'
         )
         if self.debug_enabled:
             info_text += ' Debug-Modus aktiv: Feldrahmen und Marker werden eingeblendet.'
-        ttk.Label(main, text=info_text).pack(fill='x', pady=(0, 10))
+        ttk.Label(main, text=info_text).pack(fill='x', pady=(0, 6))
 
+        # ── Vorschau-Canvas ───────────────────────────────────────────────
         preview_frame = ttk.LabelFrame(main, text='Vorschau', padding=10)
         preview_frame.pack(fill='both', expand=True)
         self.preview_label = ttk.Label(preview_frame)
         self.preview_label.pack(fill='both', expand=True)
 
+        # ── Untere Leiste: Seed / Aktualisieren / Anzahl / Generieren ────
+        bottom_bar = ttk.Frame(main)
+        bottom_bar.pack(fill='x', pady=(8, 4))
+
+        ttk.Label(bottom_bar, text='Seed:').grid(row=0, column=0, sticky='w', padx=(0, 6))
+        self.seed_var = tk.StringVar()
+        ttk.Entry(bottom_bar, textvariable=self.seed_var, width=20).grid(
+            row=0, column=1, sticky='w', padx=(0, 10))
+
+        ttk.Button(bottom_bar, text='Aktualisieren',
+                   command=self.refresh_preview).grid(row=0, column=2, sticky='w', padx=(0, 20))
+
+        ttk.Label(bottom_bar, text='Anzahl Bögen:').grid(
+            row=0, column=3, sticky='w', padx=(0, 6))
+        self.count_var = tk.StringVar(value='4')
+        ttk.Entry(bottom_bar, textvariable=self.count_var, width=10).grid(
+            row=0, column=4, sticky='w', padx=(0, 10))
+
+        ttk.Button(bottom_bar, text='Generieren',
+                   command=self.generate_files).grid(row=0, column=5, sticky='w')
+
+        if self.debug_enabled:
+            ttk.Button(bottom_bar, text='JSON neu einlesen',
+                       command=self.reload_config).grid(
+                row=0, column=6, sticky='w', padx=(12, 0))
+
+        # ── Status-Zeile ─────────────────────────────────────────────────
         self.status_var = tk.StringVar(value='Bereit.')
-        ttk.Label(main, textvariable=self.status_var).pack(fill='x', pady=(10, 0))
+        ttk.Label(main, textvariable=self.status_var).pack(fill='x', pady=(2, 0))
 
     # ------------------------------------------------------------------
     # Warnungs-Banner
@@ -509,7 +531,6 @@ class App(tk.Tk):
         for label, path in missing:
             lines.append(f'    {label}: {path}')
         self._warning_bar.config(text='\n'.join(lines))
-        # Banner direkt unter dem Fenstertitel (oberhalb der Controls)
         self._warning_bar.pack(fill='x', before=self.nametowidget(
             self._warning_bar.winfo_parent()).winfo_children()[1])
 
@@ -592,7 +613,6 @@ class App(tk.Tk):
             messagebox.showerror('Fehler beim Neueinlesen', str(e))
 
     def open_settings(self):
-        """Öffnet den Einstellungen-Dialog."""
         SettingsDialog(
             parent=self,
             config=self.generator.config,
