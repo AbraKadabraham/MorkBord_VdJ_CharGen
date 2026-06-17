@@ -1,4 +1,5 @@
-('C:\\Users\\fefl\\Downloads\\VdJ CharGen\\build\\VdJ_CharGen\\PYZ-00.pyz',
+('C:\\Users\\fefl\\OneDrive - Kontron '
+ 'AG\\Dokumente\\GitHub\\MorkBord_VdJ_CharGen\\build\\VdJ_CharGen\\PYZ-00.pyz',
  [('PIL',
    'C:\\Users\\fefl\\AppData\\Roaming\\Python\\Python312\\site-packages\\PIL\\__init__.py',
    'PYMODULE'),
