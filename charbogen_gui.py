@@ -484,33 +484,32 @@ class CharacterGenerator:
                          sheets_per_page: int = 4):
         """
         sheets_per_page:
-          1 – ein Bogen, A4 quer  (3508 x 2480)
-          2 – zwei Bögen, A4 hoch (2480 x 3508), übereinander
-          4 – vier Bögen, A4 quer (3508 x 2480), 2x2
+          1 – ein Bogen, A4 quer  (3508 x 2480), Bogen füllt das Blatt
+          2 – zwei Bögen, A4 hoch (2480 x 3508), übereinander, jeder füllt seine Hälfte
+          4 – vier Bögen, A4 quer (3508 x 2480), 2x2, jeder füllt seine Zelle
+
+        Der Bogen wird auf die exakte Zellgröße skaliert (Seitenverhältnis bleibt
+        durch Image.LANCZOS erhalten, Überstand wird zentriert beschnitten).
         """
         margin = self.config['a4_layout']['margin']
         gap    = self.config['a4_layout']['gap']
 
-        # Seitengröße und Raster je nach Modus
-        a4_w, a4_h = self.a4           # Querformat-Basiswerte
+        a4_w, a4_h = self.a4  # Querformat-Basiswerte aus Config
+
         if sheets_per_page == 2:
-            # Hochformat
-            page_size = (a4_h, a4_w)
+            page_size = (a4_h, a4_w)   # Hochformat
             cols, rows = 1, 2
         elif sheets_per_page == 1:
-            # Querformat, ein Bogen zentriert
-            page_size = (a4_w, a4_h)
+            page_size = (a4_w, a4_h)   # Querformat
             cols, rows = 1, 1
         else:
-            # 4er Standard-Querformat
-            page_size = (a4_w, a4_h)
+            page_size = (a4_w, a4_h)   # Querformat 2x2
             cols, rows = 2, 2
 
         pw, ph = page_size
         cell_w = (pw - margin * 2 - gap * (cols - 1)) // cols
         cell_h = (ph - margin * 2 - gap * (rows - 1)) // rows
 
-        # Positionen (obere linke Ecke jeder Zelle)
         positions = []
         for row in range(rows):
             for col in range(cols):
@@ -525,13 +524,10 @@ class CharacterGenerator:
         for page_index in range(total_pages):
             page  = Image.new('RGB', page_size, 'white')
             chunk = images[page_index * per_page : (page_index + 1) * per_page]
-            # chunk kann kürzer als per_page sein – leere Stellen bleiben weiß
             for img, (x, y) in zip(chunk, positions):
-                copy = img.copy()
-                copy.thumbnail((cell_w, cell_h), Image.LANCZOS)
-                px = x + (cell_w - copy.width)  // 2
-                py = y + (cell_h - copy.height) // 2
-                page.paste(copy, (px, py))
+                # Aspect-Ratio-erhaltendes Einpassen mit zentriertem Crop
+                scaled = _fit_cover(img, cell_w, cell_h)
+                page.paste(scaled, (x, y))
             page_stem = f'{base_name}_a4_page_{page_index + 1}'
             out_path  = next_free_path(output_dir, page_stem, '.png')
             page.save(out_path)
@@ -540,24 +536,24 @@ class CharacterGenerator:
 
     def generate_batch(self, count, seed, output_dir, base_name='charbogen',
                        sheets_per_page: int = 4):
+        """
+        Rendert `count` Charakterbögen und speichert NUR die A4-Seiten.
+        Einzelne Bogen-PNGs werden nicht mehr auf die Festplatte geschrieben.
+        """
         rng        = random.Random(seed)
         pools      = self.build_pools(rng)
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
-        rendered     = []
-        single_files = []
-        for i in range(1, count + 1):
+
+        rendered = []
+        for _ in range(count):
             character = self.generate_character(pools)
-            img       = self.render_sheet(character, rng)
-            stem      = f'{base_name}_{i:03d}'
-            out_path  = next_free_path(output_dir, stem, '.png')
-            img.save(out_path)
-            single_files.append(out_path)
-            rendered.append(img)
+            rendered.append(self.render_sheet(character, rng))
+
         a4_files = self.compose_a4_pages(
             rendered, output_dir, base_name,
             sheets_per_page=sheets_per_page)
-        return single_files, a4_files
+        return a4_files
 
     def generate_preview(self, seed=None, pools=None):
         rng = random.Random(seed)
@@ -565,6 +561,26 @@ class CharacterGenerator:
             pools = self.build_pools(rng)
         character = self.generate_character(pools)
         return self.render_sheet(character, rng)
+
+
+# ---------------------------------------------------------------------------
+# Hilfsfunktion: Bogen auf Zelle skalieren (cover-Modus)
+# ---------------------------------------------------------------------------
+
+def _fit_cover(img: Image.Image, cell_w: int, cell_h: int) -> Image.Image:
+    """
+    Skaliert `img` so, dass die Zelle (cell_w x cell_h) komplett ausgefüllt wird.
+    Das Seitenverhältnis des Originals bleibt erhalten; überstehendes wird
+    zentriert weggekroppt (cover-Logik, analog CSS background-size: cover).
+    """
+    src_w, src_h = img.size
+    scale = max(cell_w / src_w, cell_h / src_h)
+    new_w = math.ceil(src_w * scale)
+    new_h = math.ceil(src_h * scale)
+    scaled = img.resize((new_w, new_h), Image.LANCZOS)
+    left = (new_w - cell_w) // 2
+    top  = (new_h - cell_h) // 2
+    return scaled.crop((left, top, left + cell_w, top + cell_h))
 
 
 # ---------------------------------------------------------------------------
@@ -725,7 +741,7 @@ class App(tk.Tk):
             anchor='w', padx=10, pady=6,
         )
 
-        # ── Obere Leiste ──────────────────────────────────────────────
+        # ── Obere Leiste
         top_bar = ttk.Frame(main)
         top_bar.pack(fill='x', pady=(0, 6))
 
@@ -748,18 +764,17 @@ class App(tk.Tk):
             info_text += ' Debug-Modus aktiv.'
         ttk.Label(main, text=info_text).pack(fill='x', pady=(0, 6))
 
-        # ── Vorschau ────────────────────────────────────────────────
+        # ── Vorschau
         preview_frame = ttk.LabelFrame(main, text='Vorschau', padding=10)
         preview_frame.pack(fill='both', expand=True)
         self.preview_label = ttk.Label(preview_frame)
         self.preview_label.pack(fill='both', expand=True)
 
-        # ── Untere Leiste ────────────────────────────────────────────
+        # ── Untere Leiste
         bottom_bar = ttk.Frame(main)
         bottom_bar.pack(fill='x', pady=(8, 4))
 
         col = 0
-
         ttk.Label(bottom_bar, text='Seed:').grid(
             row=0, column=col, sticky='w', padx=(0, 4))
         col += 1
@@ -956,7 +971,7 @@ class App(tk.Tk):
             return
 
         try:
-            single_files, a4_files = self.generator.generate_batch(
+            a4_files = self.generator.generate_batch(
                 count, seed, target_dir,
                 sheets_per_page=sheets_per_page)
             layout_label = {
@@ -965,12 +980,10 @@ class App(tk.Tk):
                 4: 'A4 quer (4 Bögen)',
             }[sheets_per_page]
             self.status_var.set(
-                f'Erstellt: {len(single_files)} Einzeldateien, '
-                f'{len(a4_files)} A4-Seiten [{layout_label}] in {target_dir}')
+                f'Erstellt: {len(a4_files)} A4-Seiten [{layout_label}] in {target_dir}')
             messagebox.showinfo(
                 'Fertig',
-                f'{len(single_files)} Bögen und {len(a4_files)} A4-Seiten '
-                f'({layout_label}) wurden gespeichert.')
+                f'{len(a4_files)} A4-Seiten ({layout_label}) wurden gespeichert.')
         except Exception as e:
             messagebox.showerror('Fehler', str(e))
 
