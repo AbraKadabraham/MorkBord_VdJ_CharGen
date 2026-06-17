@@ -4,7 +4,6 @@
   "min_font_size": 14,
   "line_spacing": 6,
   "top_padding": 4,
-  "scroll_entry_gap": 8,
   "a4_size": [
     3508,
     2480
@@ -21,105 +20,40 @@
     "Art des Todes": "Art des Todes",
     "Akte / Notizen": null
   },
-  "scroll_fields": {
-    "Kräft": {
-      "scrolls": [
-        {
-          "name_column": "Heilige Schriftrollen",
-          "desc_column": "Heilige Schriftrollen Beschreibung",
-          "label": "Heilige Schriftrolle"
-        },
-        {
-          "name_column": "Unreine Schriftrollen",
-          "desc_column": "Unreine Schriftrollen Beschreibung",
-          "label": "Unreine Schriftrolle"
-        }
-      ]
-    }
-  },
   "field_layouts": {
     "Name": {
-      "box": [
-        183,
-        191,
-        481,
-        250
-      ],
+      "box": [183, 191, 481, 250],
       "font_size": 28,
       "align": "left"
     },
     "Aussehen": {
-      "box": [
-        90,
-        347,
-        465,
-        539
-      ],
+      "box": [90, 347, 465, 539],
       "font_size": 22,
       "align": "left"
     },
     "Art des Todes": {
-      "box": [
-        73,
-        706,
-        455,
-        918
-      ],
+      "box": [73, 706, 455, 918],
       "font_size": 22,
       "align": "left"
     },
     "Offene Schuld": {
-      "box": [
-        1031,
-        347,
-        1393,
-        530
-      ],
+      "box": [1031, 347, 1393, 530],
       "font_size": 22,
       "align": "left"
     },
     "Eigenheiten": {
-      "box": [
-        1035,
-        703,
-        1404,
-        897
-      ],
+      "box": [1035, 703, 1404, 897],
       "font_size": 22,
       "align": "left"
     },
     "Akte / Notizen": {
-      "box": [
-        527,
-        898,
-        969,
-        985
-      ],
+      "box": [527, 898, 969, 985],
       "font_size": 22,
       "align": "left"
-    },
-    "Kräft": {
-      "box": [
-        527,
-        347,
-        969,
-        897
-      ],
-      "font_size": 22,
-      "align": "left",
-      "desc_size_ratio": 0.8,
-      "desc_font_file": ""
     }
   },
   "attitude_markers": {
-    "x_positions": [
-      1137,
-      1193,
-      1249,
-      1306,
-      1360,
-      1415
-    ],
+    "x_positions": [1137, 1193, 1249, 1306, 1360, 1415],
     "y": 125,
     "radius": 23,
     "line_width": 3
