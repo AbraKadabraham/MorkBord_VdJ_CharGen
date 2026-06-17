@@ -234,8 +234,11 @@ class CharacterGenerator:
             if csv_column is None:
                 character[field_name] = ''
             elif isinstance(csv_column, list):
+                # Separator aus field_layouts lesen, Fallback auf einfachen Zeilenumbruch
+                separator = self.field_layouts.get(field_name, {}).get(
+                    'multi_column_separator', '\n')
                 parts = [pools[col].draw() for col in csv_column if col in pools]
-                character[field_name] = '\n'.join(p for p in parts if p)
+                character[field_name] = separator.join(p for p in parts if p)
             else:
                 character[field_name] = pools[csv_column].draw()
 
