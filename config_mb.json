@@ -66,71 +66,149 @@
   },
   "field_layouts": {
     "Name": {
-      "box": [293, 162, 863, 229],
+      "box": [
+        257,
+        144,
+        849,
+        241
+      ],
       "font_size": 45,
-      "align": "left"
+      "align": "left",
+      "valign": "middle"
     },
     "Beschreibung": {
-      "box": [128, 333, 820, 1052],
+      "box": [
+        128,
+        333,
+        820,
+        1052
+      ],
       "font_size": 45,
       "align": "left",
-      "multi_column_separator": "\n\n"
+      "multi_column_separator": "\n\n",
+      "valign": "top"
     },
     "Kräfte": {
-      "box": [130, 1176, 768, 1630],
-      "font_size": 45,
-      "align": "left"
-    },
-    "Waffe": {
-      "box": [1591, 81, 2211, 146],
-      "font_size": 45,
-      "align": "left"
-    },
-    "Rüstung": {
-      "box": [1654, 399, 2146, 491],
-      "font_size": 45,
-      "align": "left"
-    },
-    "Ausrüstung": {
-      "box": [1555, 635, 2326, 1517],
+      "box": [
+        130,
+        1176,
+        768,
+        1630
+      ],
       "font_size": 45,
       "align": "left",
-      "multi_column_separator": "\n\n"
+      "valign": "top"
+    },
+    "Waffe": {
+      "box": [
+        1591,
+        81,
+        2211,
+        146
+      ],
+      "font_size": 45,
+      "align": "left",
+      "valign": "top"
+    },
+    "Rüstung": {
+      "box": [
+        1654,
+        399,
+        2146,
+        491
+      ],
+      "font_size": 45,
+      "align": "left",
+      "valign": "top"
+    },
+    "Ausrüstung": {
+      "box": [
+        1555,
+        635,
+        2326,
+        1517
+      ],
+      "font_size": 45,
+      "align": "left",
+      "multi_column_separator": "\n\n",
+      "valign": "top"
     },
     "Stärke": {
-      "box": [870, 162, 990, 229],
+      "box": [
+        1255,
+        565,
+        1370,
+        710
+      ],
       "font_size": 55,
-      "align": "center"
+      "align": "center",
+      "valign": "middle"
     },
     "Geschick": {
-      "box": [870, 255, 990, 322],
+      "box": [
+        1230,
+        755,
+        1339,
+        890
+      ],
       "font_size": 55,
-      "align": "center"
+      "align": "center",
+      "valign": "middle"
     },
     "Präsenz": {
-      "box": [870, 348, 990, 415],
+      "box": [
+        1235,
+        1030,
+        1359,
+        1154
+      ],
       "font_size": 55,
-      "align": "center"
+      "align": "center",
+      "valign": "middle"
     },
     "Zähigkeit": {
-      "box": [870, 441, 990, 508],
+      "box": [
+        1001,
+        1291,
+        1158,
+        1422
+      ],
       "font_size": 55,
-      "align": "center"
+      "align": "center",
+      "valign": "middle"
     },
     "Trefferpunkte": {
-      "box": [987, 1390, 1242, 1490],
+      "box": [
+        1244,
+        173,
+        1345,
+        326
+      ],
       "font_size": 65,
-      "align": "center"
+      "align": "center",
+      "valign": "middle"
     },
     "Omen": {
-      "box": [987, 1535, 1242, 1681],
+      "box": [
+        987,
+        1533,
+        1242,
+        1679
+      ],
       "font_size": 45,
-      "align": "left"
+      "align": "left",
+      "valign": "top"
     },
     "Silber": {
-      "box": [1740, 1564, 1866, 1636],
+      "box": [
+        1740,
+        1564,
+        1866,
+        1636
+      ],
       "font_size": 45,
-      "align": "left"
+      "align": "left",
+      "valign": "middle"
     }
   },
   "attitude_markers": null,

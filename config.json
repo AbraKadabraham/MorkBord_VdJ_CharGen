@@ -29,7 +29,8 @@
         250
       ],
       "font_size": 28,
-      "align": "left"
+      "align": "left",
+      "valign": "middle"
     },
     "Aussehen": {
       "box": [
@@ -39,7 +40,8 @@
         539
       ],
       "font_size": 22,
-      "align": "left"
+      "align": "left",
+      "valign": "top"
     },
     "Art des Todes": {
       "box": [
@@ -49,7 +51,8 @@
         918
       ],
       "font_size": 22,
-      "align": "left"
+      "align": "left",
+      "valign": "top"
     },
     "Offene Schuld": {
       "box": [
@@ -59,7 +62,8 @@
         530
       ],
       "font_size": 22,
-      "align": "left"
+      "align": "left",
+      "valign": "top"
     },
     "Eigenheiten": {
       "box": [
@@ -69,7 +73,8 @@
         897
       ],
       "font_size": 22,
-      "align": "left"
+      "align": "left",
+      "valign": "top"
     },
     "Akte / Notizen": {
       "box": [
@@ -79,7 +84,8 @@
         985
       ],
       "font_size": 22,
-      "align": "left"
+      "align": "left",
+      "valign": "top"
     }
   },
   "attitude_markers": {
