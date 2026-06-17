@@ -10,12 +10,12 @@ from PIL import Image, ImageDraw, ImageFont, ImageTk
 from field_wizard import FieldWizard
 
 APP_DIR = Path(__file__).resolve().parent
-CONFIG_PATH = APP_DIR / 'config.json'
 
-# Verfügbare Systeme – erweiterbar
-SYSTEMS = [
-    'Vorzimmer des Jenseits',
-]
+# Systeme: Anzeigename -> Config-Datei
+SYSTEMS = {
+    'Vorzimmer des Jenseits': 'config.json',
+    'Mörk Borg':              'config_mb.json',
+}
 
 
 def next_free_path(directory, stem, suffix):
@@ -62,7 +62,7 @@ class CharacterGenerator:
         self.csv_path = (APP_DIR / config['csv_file']).resolve()
         self.field_mapping = config['field_mapping']
         self.field_layouts = config['field_layouts']
-        self.attitude = config['attitude_markers']
+        self.attitude = config.get('attitude_markers')
         self.a4 = tuple(config['a4_size'])
         self.debug = config.get('debug', {})
 
@@ -106,10 +106,22 @@ class CharacterGenerator:
                     columns[key].append(text)
         return columns
 
+    def _needed_columns(self):
+        """Gibt alle benötigten CSV-Spaltennamen zurück (Strings und Listen)."""
+        needed = set()
+        for v in self.field_mapping.values():
+            if v is None:
+                continue
+            if isinstance(v, list):
+                for col in v:
+                    needed.add(col)
+            else:
+                needed.add(v)
+        return needed
+
     def build_pools(self, rng):
         pools = {}
-        needed_columns = {v for v in self.field_mapping.values() if v}
-        for col in needed_columns:
+        for col in self._needed_columns():
             if col not in self.columns:
                 raise ValueError(f'Spalte fehlt in CSV: {col}')
             pools[col] = ColumnPool(self.columns[col], rng)
@@ -155,18 +167,26 @@ class CharacterGenerator:
         min_size = self.config.get('min_font_size', 14)
         while size >= min_size:
             font = self.find_font(size)
-            lines = self.wrap_text(draw, text, font, max_width - 8)
+            # Explizite Zeilenumbrüche (\n zwischen mehreren Spalten) respektieren
+            raw_lines = text.split('\n')
+            all_lines = []
+            for raw in raw_lines:
+                if raw.strip():
+                    all_lines.extend(self.wrap_text(draw, raw, font, max_width - 8))
+                else:
+                    all_lines.append('')
             line_box = draw.textbbox((0, 0), 'Ag', font=font)
             line_height = (line_box[3] - line_box[1]) + self.config.get('line_spacing', 6)
-            total_height = len(lines) * line_height
+            total_height = len(all_lines) * line_height
             if total_height <= max_height:
                 top_padding = self.config.get('top_padding', 4)
                 y = y1 + top_padding
-                for line in lines:
-                    bbox = draw.textbbox((0, 0), line, font=font)
-                    width = bbox[2] - bbox[0]
-                    x = x1 + 4 if align == 'left' else x1 + (max_width - width) // 2
-                    draw.text((x, y), line, fill='black', font=font)
+                for line in all_lines:
+                    if line:
+                        bbox = draw.textbbox((0, 0), line, font=font)
+                        width = bbox[2] - bbox[0]
+                        x = x1 + 4 if align == 'left' else x1 + (max_width - width) // 2
+                        draw.text((x, y), line, fill='black', font=font)
                     y += line_height
                 return
             size -= 1
@@ -185,17 +205,25 @@ class CharacterGenerator:
             label_text = f"{field_name} {list(box)}"
             label_pos = (box[0] + 4, max(0, box[1] - 22))
             draw.text(label_pos, label_text, fill=label_color, font=label_font)
-        y = self.attitude['y']
-        radius = self.attitude['radius']
-        for i, x in enumerate(self.attitude['x_positions'], start=1):
-            draw.ellipse((x - radius, y - radius, x + radius, y + radius), outline=cross_color, width=2)
-            draw.text((x - 8, y + radius + 4), str(i), fill=cross_color, font=label_font)
+        if self.attitude:
+            y = self.attitude['y']
+            radius = self.attitude['radius']
+            for i, x in enumerate(self.attitude['x_positions'], start=1):
+                draw.ellipse((x - radius, y - radius, x + radius, y + radius),
+                             outline=cross_color, width=2)
+                draw.text((x - 8, y + radius + 4), str(i),
+                          fill=cross_color, font=label_font)
 
     def generate_character(self, pools):
         character = {}
+        separator = '\n'
         for field_name, csv_column in self.field_mapping.items():
             if csv_column is None:
                 character[field_name] = ''
+            elif isinstance(csv_column, list):
+                # Mehrere Spalten -> mit Zeilenumbruch zusammenführen
+                parts = [pools[col].draw() for col in csv_column if col in pools]
+                character[field_name] = separator.join(p for p in parts if p)
             else:
                 character[field_name] = pools[csv_column].draw()
         return character
@@ -210,13 +238,17 @@ class CharacterGenerator:
             value = character.get(field_name, '').strip()
             if value:
                 self.fit_and_draw(draw, box, value, size, align)
-        idx = rng.randrange(len(self.attitude['x_positions']))
-        cx = self.attitude['x_positions'][idx]
-        cy = self.attitude['y']
-        r = self.attitude['radius']
-        line_width = self.attitude['line_width']
-        draw.line((cx - r, cy - r, cx + r, cy + r), fill='black', width=line_width)
-        draw.line((cx - r, cy + r, cx + r, cy - r), fill='black', width=line_width)
+
+        # Attitude-Marker nur wenn vorhanden
+        if self.attitude:
+            idx = rng.randrange(len(self.attitude['x_positions']))
+            cx = self.attitude['x_positions'][idx]
+            cy = self.attitude['y']
+            r = self.attitude['radius']
+            line_width = self.attitude['line_width']
+            draw.line((cx - r, cy - r, cx + r, cy + r), fill='black', width=line_width)
+            draw.line((cx - r, cy + r, cx + r, cy - r), fill='black', width=line_width)
+
         self.draw_debug_overlay(draw)
         return img
 
@@ -260,10 +292,10 @@ class CharacterGenerator:
         for i in range(1, count + 1):
             character = self.generate_character(pools)
             img = self.render_sheet(character, rng)
-            single_stem = f'{base_name}_{i:03d}'
-            single_path = next_free_path(output_dir, single_stem, '.png')
-            img.save(single_path)
-            single_files.append(single_path)
+            stem = f'{base_name}_{i:03d}'
+            out_path = next_free_path(output_dir, stem, '.png')
+            img.save(out_path)
+            single_files.append(out_path)
             rendered.append(img)
         a4_files = self.compose_a4_pages(rendered, output_dir, base_name)
         return single_files, a4_files
@@ -301,7 +333,6 @@ class SettingsDialog(tk.Toplevel):
         self._build()
 
     def _build(self):
-        # ── Dateipfade ──────────────────────────────────────────────────
         paths_frame = ttk.LabelFrame(self, text='Dateipfade', padding=10)
         paths_frame.pack(fill='x', padx=14, pady=(14, 6))
 
@@ -325,7 +356,6 @@ class SettingsDialog(tk.Toplevel):
             foreground='gray'
         ).grid(row=4, column=0, columnspan=2, sticky='w', pady=(6, 0))
 
-        # ── Felder anpassen ─────────────────────────────────────────────
         fields_frame = ttk.LabelFrame(self, text='Felder & Marker', padding=10)
         fields_frame.pack(fill='x', padx=14, pady=6)
 
@@ -341,7 +371,6 @@ class SettingsDialog(tk.Toplevel):
             command=self._open_wizard
         ).pack(anchor='w')
 
-        # ── Buttons ──────────────────────────────────────────────────────
         btn_frame = ttk.Frame(self, padding=(12, 8))
         btn_frame.pack(fill='x')
         ttk.Button(btn_frame, text='Abbrechen',
@@ -376,7 +405,6 @@ class SettingsDialog(tk.Toplevel):
                 self._csv_var.set(path)
 
     def _open_wizard(self):
-        """Öffnet den Feld-Wizard; nach Speichern wird config neu geladen."""
         FieldWizard(
             parent=self,
             config=self._config,
@@ -385,7 +413,6 @@ class SettingsDialog(tk.Toplevel):
         )
 
     def _after_wizard_save(self):
-        """Nach Wizard-Speichern: config neu einlesen + Pfad-Felder aktualisieren."""
         self._reload_callback()
         try:
             with open(self._config_path, 'r', encoding='utf-8') as f:
@@ -414,7 +441,7 @@ class SettingsDialog(tk.Toplevel):
 # ---------------------------------------------------------------------------
 
 class App(tk.Tk):
-    def __init__(self, generator):
+    def __init__(self, generator, initial_system=None):
         super().__init__()
         self.generator = generator
         self.title('Charakterbogen Generator')
@@ -426,6 +453,11 @@ class App(tk.Tk):
         self._prev_pool_seed = None
         self.debug_enabled = bool(self.generator.config.get('debug', {}).get('enabled', False))
         self._warning_bar = None
+
+        # Aktives System merken
+        system_names = list(SYSTEMS.keys())
+        self._current_system = initial_system if initial_system in SYSTEMS else system_names[0]
+
         self._build_ui()
 
         if self.generator.is_ready():
@@ -438,7 +470,6 @@ class App(tk.Tk):
         main = ttk.Frame(self, padding=12)
         main.pack(fill='both', expand=True)
 
-        # ── Warnungs-Banner (initial versteckt) ─────────────────────────
         self._warning_bar = tk.Label(
             main,
             text='',
@@ -456,15 +487,16 @@ class App(tk.Tk):
 
         ttk.Label(top_bar, text='System:').pack(side='left', padx=(0, 6))
 
-        self.system_var = tk.StringVar(value=SYSTEMS[0])
+        self.system_var = tk.StringVar(value=self._current_system)
         system_combo = ttk.Combobox(
             top_bar,
             textvariable=self.system_var,
-            values=SYSTEMS,
+            values=list(SYSTEMS.keys()),
             state='readonly',
             width=28,
         )
         system_combo.pack(side='left', padx=(0, 12))
+        system_combo.bind('<<ComboboxSelected>>', self._on_system_change)
 
         ttk.Button(
             top_bar,
@@ -472,7 +504,6 @@ class App(tk.Tk):
             command=self.open_settings,
         ).pack(side='left')
 
-        # ── Info-Text ────────────────────────────────────────────────────
         info_text = (
             'Vorschau zeigt immer einen zufällig erzeugten Bogen. '
             'Das Seed-Feld zeigt den aktuell angezeigten Vorschau-Seed und kann auch manuell gesetzt werden.'
@@ -481,13 +512,11 @@ class App(tk.Tk):
             info_text += ' Debug-Modus aktiv: Feldrahmen und Marker werden eingeblendet.'
         ttk.Label(main, text=info_text).pack(fill='x', pady=(0, 6))
 
-        # ── Vorschau-Canvas ───────────────────────────────────────────────
         preview_frame = ttk.LabelFrame(main, text='Vorschau', padding=10)
         preview_frame.pack(fill='both', expand=True)
         self.preview_label = ttk.Label(preview_frame)
         self.preview_label.pack(fill='both', expand=True)
 
-        # ── Untere Leiste: Seed / Aktualisieren / Anzahl / Generieren ────
         bottom_bar = ttk.Frame(main)
         bottom_bar.pack(fill='x', pady=(8, 4))
 
@@ -513,9 +542,44 @@ class App(tk.Tk):
                        command=self.reload_config).grid(
                 row=0, column=6, sticky='w', padx=(12, 0))
 
-        # ── Status-Zeile ─────────────────────────────────────────────────
         self.status_var = tk.StringVar(value='Bereit.')
         ttk.Label(main, textvariable=self.status_var).pack(fill='x', pady=(2, 0))
+
+    # ------------------------------------------------------------------
+    # System-Umschaltung
+    # ------------------------------------------------------------------
+
+    def _on_system_change(self, _event=None):
+        selected = self.system_var.get()
+        if selected == self._current_system:
+            return
+        self._current_system = selected
+        config_file = SYSTEMS[selected]
+        config_path = APP_DIR / config_file
+        try:
+            config = load_config(config_path)
+            self.generator.reload_from_config(config)
+        except FileNotFoundError:
+            messagebox.showwarning(
+                'Config nicht gefunden',
+                f'Die Datei "{config_file}" wurde nicht gefunden.\n'
+                'Bitte Einstellungen öffnen und Dateipfade hinterlegen.',
+                parent=self,
+            )
+        except Exception as e:
+            messagebox.showerror('Fehler beim Laden', str(e), parent=self)
+            return
+        self.preview_pools = None
+        self._prev_pool_seed = None
+        self.seed_var.set('')
+        self.last_auto_seed = None
+        if self.generator.is_ready():
+            self._hide_warning_bar()
+            self.refresh_preview()
+            self.status_var.set(f'System gewechselt: {selected}')
+        else:
+            self._show_missing_files_warning()
+            self.status_var.set(f'System "{selected}" – Dateien fehlen noch.')
 
     # ------------------------------------------------------------------
     # Warnungs-Banner
@@ -529,10 +593,9 @@ class App(tk.Tk):
             return
         lines = ['\u26a0  Fehlende Datei(en) – bitte in den Einstellungen verknüpfen:']
         for label, path in missing:
-            lines.append(f'    {label}: {path}')
-        self._warning_bar.config(text='\n'.join(lines))
-        self._warning_bar.pack(fill='x', before=self.nametowidget(
-            self._warning_bar.winfo_parent()).winfo_children()[1])
+            lines.append(f'   • {label}: {path}')
+        self._warning_bar.configure(text='\n'.join(lines))
+        self._warning_bar.pack(fill='x', pady=(0, 6))
 
     def _hide_warning_bar(self):
         if self._warning_bar:
@@ -594,8 +657,9 @@ class App(tk.Tk):
         self.preview_label.configure(image=self.preview_photo)
 
     def reload_config(self):
+        config_path = APP_DIR / SYSTEMS[self._current_system]
         try:
-            config = load_config()
+            config = load_config(config_path)
             self.generator.reload_from_config(config)
             self.debug_enabled = bool(
                 self.generator.config.get('debug', {}).get('enabled', False))
@@ -604,7 +668,7 @@ class App(tk.Tk):
             if self.generator.is_ready():
                 self._hide_warning_bar()
                 self.refresh_preview()
-                self.status_var.set('config.json wurde neu eingelesen.')
+                self.status_var.set('Konfiguration wurde neu eingelesen.')
             else:
                 self._show_missing_files_warning()
                 self.status_var.set(
@@ -613,10 +677,11 @@ class App(tk.Tk):
             messagebox.showerror('Fehler beim Neueinlesen', str(e))
 
     def open_settings(self):
+        config_path = APP_DIR / SYSTEMS[self._current_system]
         SettingsDialog(
             parent=self,
             config=self.generator.config,
-            config_path=CONFIG_PATH,
+            config_path=config_path,
             reload_callback=self.reload_config,
         )
 
@@ -653,15 +718,17 @@ class App(tk.Tk):
             messagebox.showerror('Fehler', str(e))
 
 
-def load_config():
-    with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+def load_config(path=None):
+    if path is None:
+        path = APP_DIR / 'config.json'
+    with open(path, 'r', encoding='utf-8') as f:
         return json.load(f)
 
 
 def main():
     config = load_config()
     generator = CharacterGenerator(config)
-    app = App(generator)
+    app = App(generator, initial_system=list(SYSTEMS.keys())[0])
     app.mainloop()
 
 
