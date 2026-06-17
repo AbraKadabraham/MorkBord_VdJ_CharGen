@@ -44,7 +44,7 @@
           "label": "Heilige Schriftrolle",
           "only_if_field_contains": {
             "field": "Ausrüstung",
-            "contains": "züfällige heilige Schriftrolle"
+            "contains": "zufällige heilige Schriftrolle"
           }
         },
         {
@@ -53,7 +53,7 @@
           "label": "Unreine Schriftrolle",
           "only_if_field_contains": {
             "field": "Ausrüstung",
-            "contains": "züfällige unreine Schriftrolle"
+            "contains": "zufällige unreine Schriftrolle"
           }
         }
       ]
