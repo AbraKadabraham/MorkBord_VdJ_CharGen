@@ -5,7 +5,7 @@ a = Analysis(
     ['charbogen_gui.py'],
     pathex=[],
     binaries=[],
-    datas=[('Charbogen.jpg', '.'), ('RandomTables.csv', '.'), ('config.json', '.')],
+    datas=[('charbogen_gui.py', '.'), ('field_wizard.py', '.'), ('config.json', '.'), ('config_mb.json', '.'), ('Charbogen_VdJ.jpg', '.'), ('Charbogen_MB.jpg', '.'), ('RandomTables_VdJ.csv', '.'), ('RandomTables_MB.csv', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

@@ -1,0 +1,170 @@
+{
+  "template_file": "Charbogen_MB.jpg",
+  "csv_file": "RandomTables_MB.csv",
+  "min_font_size": 14,
+  "line_spacing": 6,
+  "top_padding": 4,
+  "scroll_entry_gap": 10,
+  "a4_size": [
+    3508,
+    2480
+  ],
+  "a4_layout": {
+    "margin": 90,
+    "gap": 50
+  },
+  "field_mapping": {
+    "Name": "Name",
+    "Beschreibung": [
+      "Schreckliche Eigenschaften",
+      "Kaputte Körper",
+      "Schlechte Angewohnheiten",
+      "Beunruhigende Geschichten"
+    ],
+    "Ausrüstung": [
+      "Ausrüstung 1",
+      "Ausrüstung 2",
+      "Ausrüstung 3",
+      "Ausrüstung 4"
+    ],
+    "Stärke": null,
+    "Geschick": null,
+    "Präsenz": null,
+    "Zähigkeit": null,
+    "Trefferpunkte": null,
+    "Omen": null,
+    "Silber": null
+  },
+  "scroll_fields": {
+    "Kräfte": {
+      "scrolls": [
+        {
+          "name_column": "Heilige Schriftrollen",
+          "desc_column": "Heilige Schriftrollen Beschreibung",
+          "label": "Heilige Schriftrolle",
+          "only_if_field_contains": {
+            "field": "Ausrüstung",
+            "contains": "zufällige heilige Schriftrolle"
+          }
+        },
+        {
+          "name_column": "Unreine Schriftrollen",
+          "desc_column": "Unreine Schriftrollen Beschreibung",
+          "label": "Unreine Schriftrolle",
+          "only_if_field_contains": {
+            "field": "Ausrüstung",
+            "contains": "zufällige unreine Schriftrolle"
+          }
+        }
+      ]
+    }
+  },
+  "conditional_logic": {
+    "waffe_conditional": {
+      "if_field_nonempty": "Kräfte",
+      "then_draw_from": "Waffe (mit Schriftrolle)",
+      "else_draw_from": "Waffe",
+      "write_to": "Waffe"
+    },
+    "rüstung_conditional": {
+      "if_field_nonempty": "Kräfte",
+      "then_draw_from": "Rüstung (mit Schriftrolle)",
+      "else_draw_from": "Rüstung",
+      "write_to": "Rüstung"
+    }
+  },
+  "field_layouts": {
+    "Name": {
+      "box": [257, 144, 849, 241],
+      "font_size": 45,
+      "align": "left",
+      "valign": "middle"
+    },
+    "Beschreibung": {
+      "box": [128, 333, 820, 1052],
+      "font_size": 45,
+      "align": "left",
+      "multi_column_separator": "\n\n",
+      "valign": "top"
+    },
+    "Kräfte": {
+      "box": [130, 1176, 768, 1630],
+      "font_size": 45,
+      "align": "left",
+      "valign": "top",
+      "desc_size_ratio": 0.8,
+      "desc_font_file": ""
+    },
+    "Waffe": {
+      "box": [1591, 81, 2211, 146],
+      "font_size": 45,
+      "align": "left",
+      "valign": "top"
+    },
+    "Rüstung": {
+      "box": [1654, 399, 2146, 491],
+      "font_size": 45,
+      "align": "left",
+      "valign": "top"
+    },
+    "Ausrüstung": {
+      "box": [1555, 635, 2326, 1517],
+      "font_size": 45,
+      "align": "left",
+      "multi_column_separator": "\n\n",
+      "skip_values": ["nichts"],
+      "valign": "top"
+    },
+    "Stärke": {
+      "box": [1255, 565, 1370, 710],
+      "font_size": 55,
+      "align": "center",
+      "valign": "middle"
+    },
+    "Geschick": {
+      "box": [1230, 755, 1339, 890],
+      "font_size": 55,
+      "align": "center",
+      "valign": "middle"
+    },
+    "Präsenz": {
+      "box": [1235, 1030, 1359, 1154],
+      "font_size": 55,
+      "align": "center",
+      "valign": "middle"
+    },
+    "Zähigkeit": {
+      "box": [1001, 1291, 1158, 1422],
+      "font_size": 55,
+      "align": "center",
+      "valign": "middle"
+    },
+    "Trefferpunkte": {
+      "box": [1244, 173, 1345, 326],
+      "font_size": 65,
+      "align": "center",
+      "valign": "middle"
+    },
+    "Omen": {
+      "box": [987, 1533, 1242, 1679],
+      "font_size": 45,
+      "align": "left",
+      "valign": "top"
+    },
+    "Silber": {
+      "box": [1740, 1564, 1866, 1636],
+      "font_size": 45,
+      "align": "left",
+      "valign": "middle"
+    }
+  },
+  "attitude_markers": null,
+  "debug": {
+    "enabled": false,
+    "field_box_color": "#ff0000",
+    "field_box_width": 3,
+    "label_color": "#0000ff",
+    "label_font_size": 18,
+    "attitude_color": "#008000"
+  }
+}
