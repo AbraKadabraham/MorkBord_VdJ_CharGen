@@ -344,6 +344,10 @@
   ('email.utils',
    'C:\\Program Files\\Python312\\Lib\\email\\utils.py',
    'PYMODULE'),
+  ('field_wizard',
+   'C:\\Users\\fefl\\OneDrive - Kontron '
+   'AG\\Dokumente\\GitHub\\MorkBord_VdJ_CharGen\\field_wizard.py',
+   'PYMODULE'),
   ('fnmatch', 'C:\\Program Files\\Python312\\Lib\\fnmatch.py', 'PYMODULE'),
   ('fractions', 'C:\\Program Files\\Python312\\Lib\\fractions.py', 'PYMODULE'),
   ('ftplib', 'C:\\Program Files\\Python312\\Lib\\ftplib.py', 'PYMODULE'),
