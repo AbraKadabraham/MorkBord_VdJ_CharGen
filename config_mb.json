@@ -20,10 +20,6 @@
       "Schlechte Angewohnheiten",
       "Beunruhigende Geschichten"
     ],
-    "Kräfte": "Unreine Schriftrollen",
-    "Waffe_1": "Waffe",
-    "Waffe_2": "Waffe (mit Schriftrolle)",
-    "Rüstung": "Rüstung",
     "Ausrüstung": [
       "Ausrüstung 1",
       "Ausrüstung 2",
@@ -33,96 +29,75 @@
     "Omen": "Heilige Schriftrollen",
     "Silber": null
   },
+  "conditional_logic": {
+    "schriftrolle_trigger": {
+      "source_field": "Ausrüstung",
+      "rules": [
+        {
+          "contains": "zufällige heilige Schriftrolle",
+          "draw_from": "Heilige Schriftrollen",
+          "append_to": "Kräfte"
+        },
+        {
+          "contains": "zufällige unreine Schriftrolle",
+          "draw_from": "Unreine Schriftrollen",
+          "append_to": "Kräfte"
+        }
+      ]
+    },
+    "waffe_conditional": {
+      "if_field_nonempty": "Kräfte",
+      "then_draw_from": "Waffe (mit Schriftrolle)",
+      "else_draw_from": "Waffe",
+      "write_to": "Waffe"
+    },
+    "rüstung_conditional": {
+      "if_field_nonempty": "Kräfte",
+      "then_draw_from": "Rüstung (mit Schriftrolle)",
+      "else_draw_from": "Rüstung",
+      "write_to": "Rüstung"
+    }
+  },
   "field_layouts": {
     "Name": {
-      "box": [
-        257,
-        144,
-        854,
-        234
-      ],
+      "box": [257, 144, 854, 234],
       "font_size": 30,
       "align": "left"
     },
     "Beschreibung": {
-      "box": [
-        128,
-        333,
-        820,
-        1052
-      ],
+      "box": [128, 333, 820, 1052],
       "font_size": 22,
       "align": "left",
       "multi_column_separator": "\n"
     },
     "Kräfte": {
-      "box": [
-        130,
-        1176,
-        768,
-        1630
-      ],
+      "box": [130, 1176, 768, 1630],
       "font_size": 20,
       "align": "left"
     },
-    "Waffe_1": {
-      "box": [
-        1591,
-        83,
-        2213,
-        205
-      ],
-      "font_size": 22,
-      "align": "left"
-    },
-    "Waffe_2": {
-      "box": [
-        1654,
-        238,
-        2340,
-        313
-      ],
+    "Waffe": {
+      "box": [1591, 83, 2213, 205],
       "font_size": 22,
       "align": "left"
     },
     "Rüstung": {
-      "box": [
-        1654,
-        399,
-        2146,
-        491
-      ],
+      "box": [1654, 399, 2146, 491],
       "font_size": 22,
       "align": "left"
     },
     "Ausrüstung": {
-      "box": [
-        1555,
-        635,
-        2326,
-        1517
-      ],
+      "box": [1555, 635, 2326, 1517],
       "font_size": 20,
       "align": "left",
       "multi_column_separator": "\n"
     },
     "Omen": {
-      "box": [
-        987,
-        1535,
-        1242,
-        1681
-      ],
+      "box": [987, 1535, 1242, 1681],
       "font_size": 20,
       "align": "left"
     },
     "Silber": {
-      "box": [
-        1740,
-        1564,
-        1866,
-        1636
-      ],
+      "box": [1740, 1564, 1866, 1636],
       "font_size": 22,
       "align": "left"
     }

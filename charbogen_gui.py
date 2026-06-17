@@ -63,6 +63,7 @@ class CharacterGenerator:
         self.field_mapping = config['field_mapping']
         self.field_layouts = config['field_layouts']
         self.attitude = config.get('attitude_markers')
+        self.conditional_logic = config.get('conditional_logic', {})
         self.a4 = tuple(config['a4_size'])
         self.debug = config.get('debug', {})
 
@@ -107,7 +108,7 @@ class CharacterGenerator:
         return columns
 
     def _needed_columns(self):
-        """Gibt alle benötigten CSV-Spaltennamen zurück (Strings und Listen)."""
+        """Gibt alle benötigten CSV-Spaltennamen zurück (aus field_mapping + conditional_logic)."""
         needed = set()
         for v in self.field_mapping.values():
             if v is None:
@@ -117,6 +118,18 @@ class CharacterGenerator:
                     needed.add(col)
             else:
                 needed.add(v)
+        # Spalten aus conditional_logic ergänzen
+        for block in self.conditional_logic.values():
+            # schriftrolle_trigger-Stil: Liste von rules mit draw_from
+            for rule in block.get('rules', []):
+                col = rule.get('draw_from')
+                if col:
+                    needed.add(col)
+            # waffe/rüstung-Stil: then_draw_from / else_draw_from
+            for key in ('then_draw_from', 'else_draw_from'):
+                col = block.get(key)
+                if col:
+                    needed.add(col)
         return needed
 
     def build_pools(self, rng):
@@ -167,7 +180,6 @@ class CharacterGenerator:
         min_size = self.config.get('min_font_size', 14)
         while size >= min_size:
             font = self.find_font(size)
-            # Explizite Zeilenumbrüche (\n zwischen mehreren Spalten) respektieren
             raw_lines = text.split('\n')
             all_lines = []
             for raw in raw_lines:
@@ -216,16 +228,56 @@ class CharacterGenerator:
 
     def generate_character(self, pools):
         character = {}
-        separator = '\n'
+
+        # ── 1. Reguläres field_mapping ────────────────────────────────────
         for field_name, csv_column in self.field_mapping.items():
             if csv_column is None:
                 character[field_name] = ''
             elif isinstance(csv_column, list):
-                # Mehrere Spalten -> mit Zeilenumbruch zusammenführen
                 parts = [pools[col].draw() for col in csv_column if col in pools]
-                character[field_name] = separator.join(p for p in parts if p)
+                character[field_name] = '\n'.join(p for p in parts if p)
             else:
                 character[field_name] = pools[csv_column].draw()
+
+        # ── 2. Conditional Logic ──────────────────────────────────────────
+        for _block_name, block in self.conditional_logic.items():
+
+            # --- Schriftrolle-Trigger ---
+            # Prüft ob ein Quellfeld einen bestimmten String enthält und
+            # zieht dann einen Wert aus einer anderen Spalte.
+            if 'source_field' in block and 'rules' in block:
+                source_text = character.get(block['source_field'], '').lower()
+                for rule in block['rules']:
+                    trigger = rule.get('contains', '').lower()
+                    if trigger and trigger in source_text:
+                        draw_col = rule.get('draw_from', '')
+                        target_field = rule.get('append_to', '')
+                        if draw_col in pools and target_field:
+                            drawn = pools[draw_col].draw()
+                            if drawn:
+                                existing = character.get(target_field, '')
+                                if existing:
+                                    character[target_field] = existing + '\n' + drawn
+                                else:
+                                    character[target_field] = drawn
+
+            # --- Bedingte Spaltenauswahl (Waffe / Rüstung) ---
+            # Wählt eine von zwei Spalten abhängig davon ob ein anderes
+            # Feld bereits befüllt ist.
+            if 'if_field_nonempty' in block:
+                check_field = block['if_field_nonempty']
+                then_col    = block.get('then_draw_from', '')
+                else_col    = block.get('else_draw_from', '')
+                write_to    = block.get('write_to', '')
+                if not write_to:
+                    continue
+                field_has_content = bool(character.get(check_field, '').strip())
+                chosen_col = then_col if field_has_content else else_col
+                if chosen_col in pools:
+                    character[write_to] = pools[chosen_col].draw()
+                else:
+                    character[write_to] = ''
+
         return character
 
     def render_sheet(self, character, rng):
@@ -454,7 +506,6 @@ class App(tk.Tk):
         self.debug_enabled = bool(self.generator.config.get('debug', {}).get('enabled', False))
         self._warning_bar = None
 
-        # Aktives System merken
         system_names = list(SYSTEMS.keys())
         self._current_system = initial_system if initial_system in SYSTEMS else system_names[0]
 
@@ -481,12 +532,10 @@ class App(tk.Tk):
             pady=6,
         )
 
-        # ── Obere Leiste: System-Auswahl + Einstellungen ─────────────────
         top_bar = ttk.Frame(main)
         top_bar.pack(fill='x', pady=(0, 6))
 
         ttk.Label(top_bar, text='System:').pack(side='left', padx=(0, 6))
-
         self.system_var = tk.StringVar(value=self._current_system)
         system_combo = ttk.Combobox(
             top_bar,
@@ -545,10 +594,6 @@ class App(tk.Tk):
         self.status_var = tk.StringVar(value='Bereit.')
         ttk.Label(main, textvariable=self.status_var).pack(fill='x', pady=(2, 0))
 
-    # ------------------------------------------------------------------
-    # System-Umschaltung
-    # ------------------------------------------------------------------
-
     def _on_system_change(self, _event=None):
         selected = self.system_var.get()
         if selected == self._current_system:
@@ -581,10 +626,6 @@ class App(tk.Tk):
             self._show_missing_files_warning()
             self.status_var.set(f'System "{selected}" – Dateien fehlen noch.')
 
-    # ------------------------------------------------------------------
-    # Warnungs-Banner
-    # ------------------------------------------------------------------
-
     def _show_missing_files_warning(self):
         missing = self.generator.missing_files
         if not missing:
@@ -600,8 +641,6 @@ class App(tk.Tk):
     def _hide_warning_bar(self):
         if self._warning_bar:
             self._warning_bar.pack_forget()
-
-    # ------------------------------------------------------------------
 
     def parse_seed(self):
         seed_text = self.seed_var.get().strip()
