@@ -17,6 +17,49 @@ SYSTEMS = {
     'Mörk Borg':              'config_mb.json',
 }
 
+# Erkennungsmerkmal für das MB-System
+MB_CONFIG_FILE = 'config_mb.json'
+
+# Umrechnungstabelle: Würfelsumme → Modifikator (MÖRK BORG)
+_ABILITY_MOD_TABLE = [
+    (4,  -3),
+    (6,  -2),
+    (8,  -1),
+    (12,  0),
+    (14, +1),
+    (16, +2),
+    (20, +3),
+]
+
+
+def _sum_to_mod(total: int) -> int:
+    """Wandelt einen 3d6-Summenwert per MB-Tabelle in einen Modifikator um."""
+    for threshold, mod in _ABILITY_MOD_TABLE:
+        if total <= threshold:
+            return mod
+    return +3
+
+
+def _roll_ability(rng: random.Random, use_4d6_drop: bool = False) -> int:
+    """Würfelt ein Attribut und gibt den Modifikator zurück.
+
+    use_4d6_drop=True: 4d6, niedrigster Würfel fällt weg.
+    use_4d6_drop=False: normales 3d6.
+    """
+    if use_4d6_drop:
+        rolls = [rng.randint(1, 6) for _ in range(4)]
+        total = sum(rolls) - min(rolls)
+    else:
+        total = sum(rng.randint(1, 6) for _ in range(3))
+    return _sum_to_mod(total)
+
+
+def _format_mod(mod: int) -> str:
+    """Formatiert einen Modifikator mit Vorzeichen: +2, 0, -1 …"""
+    if mod > 0:
+        return f'+{mod}'
+    return str(mod)
+
 
 def next_free_path(directory, stem, suffix):
     directory = Path(directory)
@@ -77,6 +120,12 @@ class CharacterGenerator:
             self.columns = {}
         else:
             self.columns = self.load_csv_columns(self.csv_path)
+
+    def _is_mb_system(self) -> bool:
+        """Gibt True zurück wenn die aktuell geladene Config zum MB-System gehört."""
+        cfg_file = self.config.get('csv_file', '')
+        tmpl_file = self.config.get('template_file', '')
+        return 'mb' in Path(cfg_file).stem.lower() or 'mb' in Path(tmpl_file).stem.lower()
 
     def is_ready(self):
         return len(self.missing_files) == 0
@@ -237,6 +286,45 @@ class CharacterGenerator:
                 draw.text((x - 8, y + radius + 4), str(i),
                           fill=cross_color, font=label_font)
 
+    # ------------------------------------------------------------------
+    # MÖRK BORG: regelbasierte Attribut-Erzeugung
+    # ------------------------------------------------------------------
+
+    def generate_mb_stats(self, rng: random.Random) -> dict:
+        """Erzeugt Attribute, HP, Omen und Silber nach den MB-Bare-Bones-Regeln.
+
+        - Stärke, Geschick, Präsenz, Zähigkeit: je 3d6 → Mod-Tabelle.
+          Zwei zufällig gewählte Attribute verwenden stattdessen 4d6-drop-lowest.
+        - Trefferpunkte: max(1, toughness_mod + d8)
+        - Omen: d2
+        - Silber: 2d6 × 10
+        """
+        attr_names = ['Stärke', 'Geschick', 'Präsenz', 'Zähigkeit']
+
+        # Zwei zufällige Attribute bekommen den 4d6-drop-lowest-Bonus
+        bonus_indices = set(rng.sample(range(4), 2))
+
+        mods = {}
+        for i, name in enumerate(attr_names):
+            mods[name] = _roll_ability(rng, use_4d6_drop=(i in bonus_indices))
+
+        toughness_mod = mods['Zähigkeit']
+        hp = max(1, toughness_mod + rng.randint(1, 8))
+        omen = rng.randint(1, 2)
+        silver = (rng.randint(1, 6) + rng.randint(1, 6)) * 10
+
+        return {
+            'Stärke':         _format_mod(mods['Stärke']),
+            'Geschick':       _format_mod(mods['Geschick']),
+            'Präsenz':        _format_mod(mods['Präsenz']),
+            'Zähigkeit':      _format_mod(mods['Zähigkeit']),
+            'Trefferpunkte':  str(hp),
+            'Omen':           str(omen),
+            'Silber':         str(silver),
+        }
+
+    # ------------------------------------------------------------------
+
     def generate_character(self, pools):
         character = {}
 
@@ -284,6 +372,16 @@ class CharacterGenerator:
                     character[write_to] = pools[chosen_col].draw()
                 else:
                     character[write_to] = ''
+
+        # ── 3. MÖRK BORG: regelbasierte Stats (überschreiben null-Felder) ─
+        #    Wird nur ausgeführt wenn die aktive Config zum MB-System gehört.
+        if self._is_mb_system():
+            # rng ist hier nicht direkt verfügbar – wir nutzen den Pool-rng
+            # eines beliebigen Pools als Proxy, oder erzeugen einen eigenen.
+            # Da pools immer mindestens einen Eintrag hat, nehmen wir dessen rng.
+            pool_rng = next(iter(pools.values())).rng if pools else random.Random()
+            mb_stats = self.generate_mb_stats(pool_rng)
+            character.update(mb_stats)
 
         return character
 

@@ -27,6 +27,11 @@
       "Ausrüstung 4"
     ],
     "Kräfte": null,
+    "Stärke": null,
+    "Geschick": null,
+    "Präsenz": null,
+    "Zähigkeit": null,
+    "Trefferpunkte": null,
     "Omen": null,
     "Silber": null
   },
@@ -61,84 +66,69 @@
   },
   "field_layouts": {
     "Name": {
-      "box": [
-        293,
-        162,
-        863,
-        229
-      ],
+      "box": [293, 162, 863, 229],
       "font_size": 45,
       "align": "left"
     },
     "Beschreibung": {
-      "box": [
-        128,
-        333,
-        820,
-        1052
-      ],
+      "box": [128, 333, 820, 1052],
       "font_size": 45,
       "align": "left",
       "multi_column_separator": "\n\n"
     },
     "Kräfte": {
-      "box": [
-        130,
-        1176,
-        768,
-        1630
-      ],
+      "box": [130, 1176, 768, 1630],
       "font_size": 45,
       "align": "left"
     },
     "Waffe": {
-      "box": [
-        1591,
-        81,
-        2211,
-        146
-      ],
+      "box": [1591, 81, 2211, 146],
       "font_size": 45,
       "align": "left"
     },
     "Rüstung": {
-      "box": [
-        1654,
-        399,
-        2146,
-        491
-      ],
+      "box": [1654, 399, 2146, 491],
       "font_size": 45,
       "align": "left"
     },
     "Ausrüstung": {
-      "box": [
-        1555,
-        635,
-        2326,
-        1517
-      ],
+      "box": [1555, 635, 2326, 1517],
       "font_size": 45,
       "align": "left",
       "multi_column_separator": "\n\n"
     },
+    "Stärke": {
+      "box": [870, 162, 990, 229],
+      "font_size": 55,
+      "align": "center"
+    },
+    "Geschick": {
+      "box": [870, 255, 990, 322],
+      "font_size": 55,
+      "align": "center"
+    },
+    "Präsenz": {
+      "box": [870, 348, 990, 415],
+      "font_size": 55,
+      "align": "center"
+    },
+    "Zähigkeit": {
+      "box": [870, 441, 990, 508],
+      "font_size": 55,
+      "align": "center"
+    },
+    "Trefferpunkte": {
+      "box": [987, 1390, 1242, 1490],
+      "font_size": 65,
+      "align": "center"
+    },
     "Omen": {
-      "box": [
-        987,
-        1535,
-        1242,
-        1681
-      ],
+      "box": [987, 1535, 1242, 1681],
       "font_size": 45,
       "align": "left"
     },
     "Silber": {
-      "box": [
-        1740,
-        1564,
-        1866,
-        1636
-      ],
+      "box": [1740, 1564, 1866, 1636],
       "font_size": 45,
       "align": "left"
     }
