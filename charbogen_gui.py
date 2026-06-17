@@ -7,7 +7,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from PIL import Image, ImageDraw, ImageFont, ImageTk
 
-from field_wizard import FieldWizard
+from field_wizard import FieldWizard, _find_font_path
 
 APP_DIR = Path(__file__).resolve().parent
 
@@ -118,14 +118,11 @@ class CharacterGenerator:
                     needed.add(col)
             else:
                 needed.add(v)
-        # Spalten aus conditional_logic ergänzen
         for block in self.conditional_logic.values():
-            # schriftrolle_trigger-Stil: Liste von rules mit draw_from
             for rule in block.get('rules', []):
                 col = rule.get('draw_from')
                 if col:
                     needed.add(col)
-            # waffe/rüstung-Stil: then_draw_from / else_draw_from
             for key in ('then_draw_from', 'else_draw_from'):
                 col = block.get(key)
                 if col:
@@ -140,7 +137,16 @@ class CharacterGenerator:
             pools[col] = ColumnPool(self.columns[col], rng)
         return pools
 
-    def find_font(self, size):
+    def find_font(self, size, font_file=''):
+        """Gibt ein ImageFont zurück. Wenn font_file angegeben, wird diese bevorzugt."""
+        if font_file:
+            path = _find_font_path(font_file, APP_DIR)
+            if path:
+                try:
+                    return ImageFont.truetype(str(path), size=size)
+                except Exception:
+                    pass  # Fallthrough zu automatischer Suche
+
         candidates = [
             APP_DIR / 'fonts' / 'DejaVuSerif.ttf',
             Path('/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf'),
@@ -172,14 +178,14 @@ class CharacterGenerator:
             lines.append(current)
         return lines
 
-    def fit_and_draw(self, draw, box, text, start_size, align='left'):
+    def fit_and_draw(self, draw, box, text, start_size, align='left', font_file=''):
         x1, y1, x2, y2 = box
         max_width = x2 - x1
         max_height = y2 - y1
         size = start_size
         min_size = self.config.get('min_font_size', 14)
         while size >= min_size:
-            font = self.find_font(size)
+            font = self.find_font(size, font_file)
             raw_lines = text.split('\n')
             all_lines = []
             for raw in raw_lines:
@@ -234,7 +240,6 @@ class CharacterGenerator:
             if csv_column is None:
                 character[field_name] = ''
             elif isinstance(csv_column, list):
-                # Separator aus field_layouts lesen, Fallback auf einfachen Zeilenumbruch
                 separator = self.field_layouts.get(field_name, {}).get(
                     'multi_column_separator', '\n')
                 parts = [pools[col].draw() for col in csv_column if col in pools]
@@ -245,9 +250,6 @@ class CharacterGenerator:
         # ── 2. Conditional Logic ──────────────────────────────────────────
         for _block_name, block in self.conditional_logic.items():
 
-            # --- Schriftrolle-Trigger ---
-            # Prüft ob ein Quellfeld einen bestimmten String enthält und
-            # zieht dann einen Wert aus einer anderen Spalte.
             if 'source_field' in block and 'rules' in block:
                 source_text = character.get(block['source_field'], '').lower()
                 for rule in block['rules']:
@@ -264,9 +266,6 @@ class CharacterGenerator:
                                 else:
                                     character[target_field] = drawn
 
-            # --- Bedingte Spaltenauswahl (Waffe / Rüstung) ---
-            # Wählt eine von zwei Spalten abhängig davon ob ein anderes
-            # Feld bereits befüllt ist.
             if 'if_field_nonempty' in block:
                 check_field = block['if_field_nonempty']
                 then_col    = block.get('then_draw_from', '')
@@ -290,11 +289,11 @@ class CharacterGenerator:
             box = tuple(layout['box'])
             size = layout['font_size']
             align = layout.get('align', 'left')
+            font_file = layout.get('font_file', '')  # optional, '' = automatisch
             value = character.get(field_name, '').strip()
             if value:
-                self.fit_and_draw(draw, box, value, size, align)
+                self.fit_and_draw(draw, box, value, size, align, font_file)
 
-        # Attitude-Marker nur wenn vorhanden
         if self.attitude:
             idx = rng.randrange(len(self.attitude['x_positions']))
             cx = self.attitude['x_positions'][idx]
@@ -416,8 +415,8 @@ class SettingsDialog(tk.Toplevel):
 
         ttk.Label(
             fields_frame,
-            text='Position und Größe aller Textfelder sowie die Attitude-Marker\n'
-                 'können visuell auf dem Bogen eingestellt werden.'
+            text='Position, Größe, Schriftgröße, Ausrichtung und Schriftart aller\n'
+                 'Textfelder sowie die Attitude-Marker können visuell angepasst werden.'
         ).pack(anchor='w', pady=(0, 8))
 
         ttk.Button(
@@ -635,7 +634,7 @@ class App(tk.Tk):
             if self._warning_bar:
                 self._warning_bar.pack_forget()
             return
-        lines = ['\u26a0  Fehlende Datei(en) – bitte in den Einstellungen verknüpfen:']
+        lines = ['⚠  Fehlende Datei(en) – bitte in den Einstellungen verknüpfen:']
         for label, path in missing:
             lines.append(f'   • {label}: {path}')
         self._warning_bar.configure(text='\n'.join(lines))
