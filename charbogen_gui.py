@@ -7,6 +7,8 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from PIL import Image, ImageDraw, ImageFont, ImageTk
 
+from field_wizard import FieldWizard
+
 APP_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = APP_DIR / 'config.json'
 
@@ -290,14 +292,19 @@ class App(tk.Tk):
 
         ttk.Button(controls, text='Generieren', command=self.generate_files).grid(row=0, column=5, sticky='w', padx=(0, 12))
 
+        # Wizard-Button (immer sichtbar)
+        ttk.Button(
+            controls, text='🗺  Felder anpassen',
+            command=self.open_field_wizard
+        ).grid(row=0, column=6, sticky='w', padx=(12, 0))
+
         if self.debug_enabled:
-            ttk.Button(controls, text='JSON neu einlesen', command=self.reload_config).grid(row=0, column=6, sticky='w')
+            ttk.Button(controls, text='JSON neu einlesen', command=self.reload_config).grid(row=0, column=7, sticky='w', padx=(6, 0))
 
         info_text = 'Vorschau zeigt immer einen zufällig erzeugten Bogen. Das Seed-Feld zeigt den aktuell angezeigten Vorschau-Seed und kann auch manuell gesetzt werden.'
         if self.debug_enabled:
             info_text += ' Debug-Modus aktiv: Feldrahmen und Marker werden eingeblendet.'
-        info = ttk.Label(main, text=info_text)
-        info.pack(fill='x', pady=(0, 10))
+        ttk.Label(main, text=info_text).pack(fill='x', pady=(0, 10))
 
         preview_frame = ttk.LabelFrame(main, text='Vorschau', padding=10)
         preview_frame.pack(fill='both', expand=True)
@@ -322,22 +329,18 @@ class App(tk.Tk):
         if not seed_text:
             seed = random.randint(0, 2_147_483_647)
             return seed, False
-
         try:
             typed_seed = int(seed_text)
         except ValueError:
             raise ValueError('Der Seed muss eine ganze Zahl sein.')
-
         if self.last_auto_seed is not None and seed_text == str(self.last_auto_seed):
             seed = random.randint(0, 2_147_483_647)
             return seed, False
-
         return typed_seed, True
 
     def refresh_preview(self):
         try:
             seed, user_locked = self.determine_preview_seed()
-            # Pool zurücksetzen wenn Seed manuell geändert wurde
             if self.preview_pools is None or seed != self._prev_pool_seed:
                 self.preview_pools = self.generator.build_pools(random.Random(seed))
                 self._prev_pool_seed = seed
@@ -366,10 +369,21 @@ class App(tk.Tk):
             config = load_config()
             self.generator.reload_from_config(config)
             self.debug_enabled = bool(self.generator.config.get('debug', {}).get('enabled', False))
+            self.preview_pools = None
+            self._prev_pool_seed = None
             self.refresh_preview()
             self.status_var.set('config.json wurde neu eingelesen.')
         except Exception as e:
             messagebox.showerror('Fehler beim Neueinlesen', str(e))
+
+    def open_field_wizard(self):
+        """Öffnet den Feld-Wizard; nach Speichern wird config automatisch neu geladen."""
+        FieldWizard(
+            parent=self,
+            config=self.generator.config,
+            config_path=CONFIG_PATH,
+            reload_callback=self.reload_config,
+        )
 
     def generate_files(self):
         try:
