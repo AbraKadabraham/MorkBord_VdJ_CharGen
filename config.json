@@ -22,38 +22,81 @@
   },
   "field_layouts": {
     "Name": {
-      "box": [183, 191, 481, 250],
+      "box": [
+        183,
+        191,
+        481,
+        250
+      ],
       "font_size": 28,
-      "align": "left"
+      "align": "left",
+      "valign": "middle"
     },
     "Aussehen": {
-      "box": [90, 347, 465, 539],
+      "box": [
+        90,
+        347,
+        465,
+        539
+      ],
       "font_size": 22,
-      "align": "left"
+      "align": "left",
+      "valign": "top"
     },
     "Art des Todes": {
-      "box": [73, 706, 455, 918],
+      "box": [
+        73,
+        706,
+        455,
+        918
+      ],
       "font_size": 22,
-      "align": "left"
+      "align": "left",
+      "valign": "top"
     },
     "Offene Schuld": {
-      "box": [1031, 347, 1393, 530],
+      "box": [
+        1031,
+        347,
+        1393,
+        530
+      ],
       "font_size": 22,
-      "align": "left"
+      "align": "left",
+      "valign": "top"
     },
     "Eigenheiten": {
-      "box": [1035, 703, 1404, 897],
+      "box": [
+        1035,
+        703,
+        1404,
+        897
+      ],
       "font_size": 22,
-      "align": "left"
+      "align": "left",
+      "valign": "top"
     },
     "Akte / Notizen": {
-      "box": [527, 898, 969, 985],
+      "box": [
+        527,
+        898,
+        969,
+        985
+      ],
       "font_size": 22,
-      "align": "left"
+      "align": "left",
+      "valign": "top"
     }
   },
   "attitude_markers": {
-    "x_positions": [1137, 1193, 1249, 1306, 1360, 1415],
+    "x_positions": [
+      1137,
+      1193,
+      1249,
+      1306,
+      1360,
+      1415
+    ],
     "y": 125,
     "radius": 23,
     "line_width": 3
